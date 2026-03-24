@@ -5,6 +5,7 @@ env/
 # Archivos de caché de Python
 __pycache__/
 *.pyc
+semilla.pyc
 
 # Variables de entorno
 .env
