@@ -38,7 +38,7 @@ npm run dev
 ---
 👨‍💻 Distribución del Trabajo (Arquitectura Modular)
 
-Para evitar conflictos en el código, el sistema se ha dividido en módulos. Cada integrante es dueño de sus respectivas carpetas y archivos. ¡Por favor, no editen los archivos de sus compañeros!
+Para evitar conflictos en el código, el sistema se ha  dividido en módulos. Cada integrante es dueño de sus respectivas carpetas y archivos. ¡Por favor, no editen los archivos de sus compañeros!
 🎟️ Módulo 1: Gestión de Eventos y Cartelera (El Core)
 
     Encargado: Javier Hernández Flores (CU-01, CU-02)
