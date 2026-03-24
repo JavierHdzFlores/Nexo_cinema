@@ -2,7 +2,7 @@
 from sqlalchemy import Column, Integer, String
 from database import Base
 
-# Aquí Luis Eduardo y tú definirán todas las clases de su diagrama UML
+
 
 class Sala(Base):
     __tablename__ = "salas"  # Nombre de la tabla en MySQL
