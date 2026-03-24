@@ -20,18 +20,75 @@ Antes de empezar a programar, asegúrate de tener instaladas las siguientes herr
 
 Clona este repositorio en tu máquina local:
 ```bash
-git clone [https://github.com/TU_USUARIO/nexo-cinema.git](https://github.com/TU_USUARIO/nexo-cinema.git)
-cd nexo-cinema
-# 🎬 Proyecto: Sistema de Gestión
+git clone [https://github.com/TU_USUARIO/nexo-cinema.git](https://github.com/TU_USUARIO/nexo-cinema.git)```
 
-¡Bienvenidos al repositorio principal! A continuación, se detallan los pasos para levantar el entorno de desarrollo, la distribución de módulos del equipo y las reglas de control de versiones.
+"Levantar el Backend (Python / FastAPI)"
+
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+
+"Levantar el Frontend (Next.js)"
+cd frontend
+
+Instala las dependencias de Node:
+npm install
+npm run dev
 
 ---
+👨‍💻 Distribución del Trabajo (Arquitectura Modular)
 
-## 🚀 Cómo Empezar (Setup)
+Para evitar conflictos en el código, el sistema se ha dividido en módulos. Cada integrante es dueño de sus respectivas carpetas y archivos. ¡Por favor, no editen los archivos de sus compañeros!
+🎟️ Módulo 1: Gestión de Eventos y Cartelera (El Core)
 
-### 1️⃣ Levantar el Backend (Python / FastAPI)
+    Encargado: Javier Hernández Flores (CU-01, CU-02)
 
-Abre una terminal y entra a la carpeta del backend:
-```bash
-cd backend
+    Backend: backend/routers/eventos.py
+
+    Frontend: frontend/src/app/cartelera/page.tsx
+
+🍿 Módulo 2A: Ventas y Atención al Cliente (Boletos y Paquetes)
+
+    Encargado: Hernández Guzmán Luis Diego (CU-03, CU-04)
+
+    Backend: backend/routers/taquilla.py
+
+    Frontend: frontend/src/app/taquilla/page.tsx
+
+🍬 Módulo 2B: Ventas (Dulcería y Lealtad)
+
+    Encargado: Suarez Dolores Miguel (CU-05, CU-06)
+
+    Backend: backend/routers/dulceria.py
+
+    Frontend: frontend/src/app/dulceria/page.tsx
+
+🧹 Módulo 3: Operaciones y Logística (Salas e Inventario)
+
+    Encargado: José Canseco Eduardo Rául (CU-07, CU-08)
+
+    Backend: backend/routers/operaciones.py
+
+    Frontend: frontend/src/app/operaciones/page.tsx
+
+📊 Módulo 4: Administración y Finanzas
+
+    Encargado: Gonzales Giron Luis Eduardo (CU-09, CU-10)
+
+    Backend: backend/routers/finanzas.py
+
+    Frontend: frontend/src/app/admin/page.tsx
+
+⚠️ Regla de Oro (Flujo de Trabajo Git)
+
+ESTÁ PROHIBIDO TRABAJAR DIRECTAMENTE EN LA RAMA main. Cada vez que vayas a programar tu parte, sigue estos pasos:
+
+    Asegúrate de tener lo último: git pull origin main
+
+    Crea tu rama de trabajo: git checkout -b nombre-de-tu-modulo (ej. git checkout -b modulo-dulceria)
+
+    Programa y guarda tus cambios: git add . y git commit -m "Descripción de lo que hiciste"
+
+    Sube tu rama: git push origin nombre-de-tu-modulo
+
+    Avisa al líder para que haga el Merge a main.
