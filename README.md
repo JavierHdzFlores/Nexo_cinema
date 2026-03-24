@@ -22,3 +22,16 @@ Clona este repositorio en tu máquina local:
 ```bash
 git clone [https://github.com/TU_USUARIO/nexo-cinema.git](https://github.com/TU_USUARIO/nexo-cinema.git)
 cd nexo-cinema
+# 🎬 Proyecto: Sistema de Gestión
+
+¡Bienvenidos al repositorio principal! A continuación, se detallan los pasos para levantar el entorno de desarrollo, la distribución de módulos del equipo y las reglas de control de versiones.
+
+---
+
+## 🚀 Cómo Empezar (Setup)
+
+### 1️⃣ Levantar el Backend (Python / FastAPI)
+
+Abre una terminal y entra a la carpeta del backend:
+```bash
+cd backend
