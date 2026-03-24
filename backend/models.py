@@ -3,9 +3,6 @@ from sqlalchemy.orm import relationship
 from database import Base
 import datetime
 
-# ==========================================
-# 1. MÓDULO DE OPERACIONES (Salas)
-# ==========================================
 class Sala(Base):
     __tablename__ = "salas"
     id_sala = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -14,9 +11,7 @@ class Sala(Base):
     estado = Column(String(20), default="Disponible") # Disponible, En limpieza, Evento Privado
     tipo = Column(String(20)) # VIP, IMAX, Tradicional
 
-# ==========================================
-# 2. HERENCIA DE USUARIOS (Justificación del PDF)
-# ==========================================
+
 class Usuario(Base):
     __tablename__ = "usuarios"
     id_usuario = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -46,9 +41,7 @@ class Empleado(Usuario):
 
     __mapper_args__ = {"polymorphic_identity": "empleado"}
 
-# ==========================================
-# 3. HERENCIA DE EVENTOS (Tu Core - Módulo 1)
-# ==========================================
+
 class Evento(Base):
     __tablename__ = "eventos"
     id_evento = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -83,9 +76,7 @@ class EventoPrivado(Evento):
 
     __mapper_args__ = {"polymorphic_identity": "evento_privado"}
 
-# ==========================================
-# 4. MÓDULO DE VENTAS E INVENTARIO
-# ==========================================
+
 class Venta(Base):
     __tablename__ = "ventas"
     id_venta = Column(Integer, primary_key=True, index=True, autoincrement=True)
