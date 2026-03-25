@@ -8,7 +8,7 @@ def poblar_base_de_datos():
     
     # Verificamos si ya hay salas para no duplicar datos si lo corres dos veces
     if db.query(Sala).first():
-        print("⚠️ La base de datos ya tiene información. No se insertó nada nuevo.")
+        print(" La base de datos ya tiene información. No se insertó nada nuevo.")
         db.close()
         return
 
@@ -48,7 +48,7 @@ def poblar_base_de_datos():
     db.commit()
     db.close()
     
-    print("✅ ¡Datos inyectados con éxito! Ve a MySQL Workbench para comprobarlo.")
+    print(" ¡Datos inyectados con éxito! Ve a MySQL Workbench para comprobarlo.")
 
 if __name__ == "__main__":
     poblar_base_de_datos()
