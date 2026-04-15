@@ -5,8 +5,9 @@ from database import engine, Base
 import models # Importamos nuestros modelos
 from routers.finanzas import router as finanzas_router
 from routers import cartelera
+from routers import auth
 
-# Esta línea es la MAGIA: Crea todas las tablas en MySQL automáticamente
+# Crea todas las tablas en MySQL automáticamente
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -34,3 +35,6 @@ app.include_router(cartelera.router)
 @app.get("/")
 def ruta_raiz():
     return {"mensaje": "¡Base de datos conectada e inicializada!"}
+
+#incluir router de autenticación
+app.include_router(auth.router)

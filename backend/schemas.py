@@ -34,3 +34,19 @@ class ClienteResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ==========================================
+# ESQUEMAS PARA AUTENTICACIÓN / LOGIN
+# ==========================================
+
+class LoginRequest(BaseModel):
+    correo: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    usuario_id: int
+    nombre: str
+    tipo_usuario: str
+    puesto: Optional[str] = None # Por si es empleado
