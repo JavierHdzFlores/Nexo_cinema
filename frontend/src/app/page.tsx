@@ -1,6 +1,7 @@
 import { Navbar } from "./components/Navbar";
 import { HeroCarousel } from "./components/HeroCarousel";
-import { MovieGrid } from "./components/MovieGrid";
+import { MovieGrid } from "./components/MovieGrid"; // Importamos la cartelera
+import { Footer } from "./components/Footer"; // 1. Importamos el Footer
 
 export default function Home() {
   return (
@@ -14,7 +15,8 @@ export default function Home() {
       {/* 3. Nuestra sección de Cartelera y Horarios */}
       <MovieGrid />
 
-      {/* Aquí iremos agregando las siguientes secciones (Cartelera, Ofertas, Footer, etc.) */}
+    {/* 2. Lo colocamos hasta abajo */}
+      <Footer />
     </main>
   );
 }
