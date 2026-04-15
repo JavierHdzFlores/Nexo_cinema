@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Play, Star, Clock, Ticket } from "lucide-rea
 const heroMovies = [
   {
     id: 1,
-    title: "SINGULARITY",
+    title: "SINGULAR",
     subtitle: "El Último Horizonte",
     genre: "Ciencia Ficción",
     rating: 9.1,
