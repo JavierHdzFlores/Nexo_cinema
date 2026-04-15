@@ -4,8 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 import models # Importamos nuestros modelos
 from routers.finanzas import router as finanzas_router
-from routers import cartelera
-from routers import auth
+from routers import cartelera, auth, usuarios
 
 # Crea todas las tablas en MySQL automáticamente
 Base.metadata.create_all(bind=engine)
@@ -25,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir routers
+# Incluir routers de diferentes módulos
 app.include_router(finanzas_router)
 
 app = FastAPI(title="Nexo Cinema API")
@@ -38,3 +37,5 @@ def ruta_raiz():
 
 #incluir router de autenticación
 app.include_router(auth.router)
+#incluir router de usuarios
+app.include_router(usuarios.router)
