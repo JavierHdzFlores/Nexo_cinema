@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boo
 from sqlalchemy.orm import relationship
 from database import Base
 from pydantic import BaseModel
-from datetime import datetime
+#from datetime import datetime
 from typing import Optional
 
 
@@ -473,17 +473,3 @@ class ProductoDulceria(Base):
     precio = Column(Float, nullable=False)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, default=10) # Para las alertas de inventario
-
-# Esquema para leer los datos (Response)
-class ProyeccionPublicaResponse(BaseModel):
-    id_evento: int
-    nombre: str # Heredado de Evento
-    fecha_hora_inicio: datetime
-    fecha_hora_fin: Optional[datetime] = None
-    pelicula: str
-    clasificacion: Optional[str] = None
-    precio_boleto: float
-
-    # Esto le dice a Pydantic que lea desde objetos de SQLAlchemy
-    class Config:
-        from_attributes = True
