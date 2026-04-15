@@ -34,3 +34,38 @@ class ClienteResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ==========================================
+# ESQUEMAS PARA SALAS
+# ==========================================
+
+class SalaEstadoUpdate(BaseModel):
+    estado: str
+
+class SalaResponse(BaseModel):
+    id_sala: int
+    nombre: str
+    capacidad: int
+    estado: str
+    tipo: str
+
+    class Config:
+        from_attributes = True
+
+
+# ==========================================
+# ESQUEMAS PARA SALAS
+# ==========================================
+
+class InventarioEntrada(BaseModel):
+    id_insumo: int
+    cantidad: int
+
+class InsumoResponse(BaseModel):
+    id_insumo: int
+    nombre: str
+    stock_actual: int
+    stock_minimo: int
+
+    class Config:
+        from_attributes = True
