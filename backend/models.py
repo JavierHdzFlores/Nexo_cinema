@@ -473,3 +473,60 @@ class ProductoDulceria(Base):
     precio = Column(Float, nullable=False)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, default=10) # Para las alertas de inventario
+
+
+class RegistroLimpieza(Base):
+    __tablename__ = "registros_limpieza"
+
+    id_registro = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
+    fecha_inicio = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_fin = Column(DateTime, nullable=True)
+    duracion = Column(Float, nullable=True)
+
+    sala = relationship("Sala", backref="registros_limpieza")
+
+class RegistroLimpieza(Base):
+    __tablename__ = "registros_limpieza"
+
+    id_registro = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
+    fecha_inicio = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_fin = Column(DateTime, nullable=True)
+    duracion = Column(Float, nullable=True)
+
+    sala = relationship("Sala", backref="registros_limpieza")
+
+
+class Insumo(Base):
+    __tablename__ = "insumos"
+
+    id_insumo = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    nombre = Column(String(100), nullable=False)
+    stock_actual = Column(Integer, nullable=False)
+    stock_minimo = Column(Integer, default=10)
+
+    def actualizar_stock(self, cantidad: int):
+        self.stock_actual += cantidad
+
+class MovimientoInventario(Base):
+    __tablename__ = "movimientos_inventario"
+
+    id_movimiento = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_insumo = Column(Integer, ForeignKey("insumos.id_insumo"))
+    tipo = Column(String(20))  # entrada / salida
+    cantidad = Column(Integer, nullable=False)
+    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+
+    insumo = relationship("Insumo", backref="movimientos")
+
+class AlertaStock(Base):
+    __tablename__ = "alertas_stock"
+
+    id_alerta = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_insumo = Column(Integer, ForeignKey("insumos.id_insumo"))
+    mensaje = Column(String(255))
+    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+    activa = Column(Boolean, default=True)
+
+    insumo = relationship("Insumo", backref="alertas")
