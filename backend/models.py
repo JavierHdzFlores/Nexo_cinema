@@ -1,6 +1,9 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
+from pydantic import BaseModel
+#from datetime import datetime
+from typing import Optional
 
 
 import datetime
@@ -142,6 +145,8 @@ class Evento(Base):
 
     # Relaciones
     sala = relationship("Sala")
+    # Asegúrate de tener esto dentro de tu clase Evento:
+    factura_evento = relationship("FacturaEvento", uselist=False, back_populates="evento")
 
     __mapper_args__ = {
         "polymorphic_identity": "evento",
@@ -211,6 +216,7 @@ class Venta(Base):
     # Relaciones
     cliente = relationship("Cliente", backref="ventas", foreign_keys=[id_cliente])
     evento = relationship("Evento", backref="ventas", foreign_keys=[id_evento])
+    factura_individual = relationship("FacturaIndividual", uselist=False, back_populates="venta")   
     
     def obtenerDatosVenta(self) -> dict:
         """
