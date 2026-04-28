@@ -50,3 +50,20 @@ class TokenResponse(BaseModel):
     nombre: str
     tipo_usuario: str
     puesto: Optional[str] = None # Por si es empleado
+
+# ==========================================
+# ESQUEMAS PARA CREACIÓN DE USUARIOS (STAFF)
+# ==========================================
+
+class EmpleadoCreate(BaseModel):
+    nombre: str
+    correo: str
+    password: str
+    puesto: str
+    turno: str
+
+class GerenteCreate(BaseModel):
+    nombre: str
+    correo: str
+    password: str
+    matricula: str
