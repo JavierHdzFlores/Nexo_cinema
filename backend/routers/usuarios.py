@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Empleado, Gerente, Usuario
+from models import Empleado, Gerente, Usuario, Cliente
 import schemas
 from passlib.context import CryptContext
 
@@ -16,6 +16,8 @@ router = APIRouter(
 def get_password_hash(password: str):
     return pwd_context.hash(password)
 
+
+#post
 @router.post("/empleado", status_code=status.HTTP_201_CREATED)
 def crear_empleado(empleado: schemas.EmpleadoCreate, db: Session = Depends(get_db)):
     # 1. Verificar si el correo ya existe en la tabla principal de usuarios
@@ -39,7 +41,7 @@ def crear_empleado(empleado: schemas.EmpleadoCreate, db: Session = Depends(get_d
     
     return {"mensaje": "Empleado creado exitosamente", "id": nuevo_empleado.id_empleado}
 
-
+#post gegrente
 @router.post("/gerente", status_code=status.HTTP_201_CREATED)
 def crear_gerente(gerente: schemas.GerenteCreate, db: Session = Depends(get_db)):
     # 1. Verificar correo
@@ -65,3 +67,26 @@ def crear_gerente(gerente: schemas.GerenteCreate, db: Session = Depends(get_db))
     db.refresh(nuevo_gerente)
     
     return {"mensaje": "Gerente creado exitosamente", "id": nuevo_gerente.id_gerente}
+
+#post cliente 
+
+@router.post("/cliente", status_code=status.HTTP_201_CREATED)
+def crear_cliente(cliente: schemas.ClientCreate, db: Session=Depends(get_db)):
+    #verificamos si el correo existe 
+    usuario_existe= db.query(Usuario).filter(Usuario.correo == cliente.correo).first()
+    if usuario_existe:
+        raise HTTPException(status_code=400, detail="El correo ya esta registrado, inicie sección o revise su correo")
+    #instanciamos cliente con COntraseña encriptada
+    nuevo_cliente = cliente(
+        nombre=cliente.nombre,
+        correo=cliente.correo,
+        password= get_password_hash(cliente.password),
+        rfc=cliente.rfc,
+        codigo_postal=cliente.codigo_postal
+    )
+
+    #guardamos en la base de datos 
+
+    db.add(nuevo_cliente)
+    db.commit()
+    db.refresh(nuevo_cliente)
