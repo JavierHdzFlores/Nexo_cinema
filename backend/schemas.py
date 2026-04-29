@@ -73,7 +73,7 @@ class ClienteCreate(BaseModel):
     correo: str
     password: str
     rfc: Optional[str] = None
-    codigo_postal= Optional[str] = None
+    codigo_postal: Optional[str] = None
     
 
 # ==========================================

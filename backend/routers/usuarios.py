@@ -71,7 +71,7 @@ def crear_gerente(gerente: schemas.GerenteCreate, db: Session = Depends(get_db))
 #post cliente 
 
 @router.post("/cliente", status_code=status.HTTP_201_CREATED)
-def crear_cliente(cliente: schemas.ClientCreate, db: Session=Depends(get_db)):
+def crear_cliente(cliente: schemas.ClienteCreate, db: Session=Depends(get_db)):
     #verificamos si el correo existe 
     usuario_existe= db.query(Usuario).filter(Usuario.correo == cliente.correo).first()
     if usuario_existe:
