@@ -68,6 +68,46 @@ class GerenteCreate(BaseModel):
     password: str
     matricula: str
 
+# ==========================================
+# ESQUEMAS PARA DULCERÍA Y LEALTAD (CU-05, CU-06)
+# ==========================================
+
+class ArticuloDulceriaResponse(BaseModel):
+    id_articulo: int
+    nombre: str
+    precio: float
+    tipo_articulo: str
+
+    class Config:
+        from_attributes = True
+
+class DetalleVentaRequest(BaseModel):
+    id_articulo: int
+    cantidad: int
+
+class VentaDulceriaRequest(BaseModel):
+    id_cliente: Optional[int] = None
+    detalles: list[DetalleVentaRequest]
+    usar_puntos: bool = False
+    puntos_a_usar: Optional[int] = 0
+
+class MovimientoMonederoResponse(BaseModel):
+    """
+    Representa el comprobante de puntos del Ticket (CU-06).
+    Diagrama 4: Ticket.generarDetalle(saldoAnt, mov, saldoNvo)
+    """
+    tipo_movimiento: str          # "Acumulacion" | "Canje" | "Sin movimiento"
+    saldo_anterior: int
+    puntos_movimiento: int        # positivo = acumulación, negativo = canje
+    saldo_nuevo: int
+
+class VentaDulceriaResponse(BaseModel):
+    id_venta: int
+    total: float
+    estado: str
+    mensaje: str
+    # CU-06: Comprobante de monedero (Optional — solo si hubo cliente identificado)
+    monedero: Optional[MovimientoMonederoResponse] = None
 class ClientCreate(BaseModel):
     nombre: str
     correo: str

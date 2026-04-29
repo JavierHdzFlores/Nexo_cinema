@@ -187,10 +187,13 @@ class Venta(Base):
     id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=True)
     fecha_venta = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     total = Column(Float, nullable=False)
+    estado = Column(String(50), default="Iniciada")
+    id_empleado = Column(Integer, ForeignKey("empleados.id_empleado"), nullable=True)
     
     # Relaciones actualizadas a back_populates
     cliente = relationship("Cliente", back_populates="ventas")
     evento = relationship("Evento", back_populates="ventas")
+    vendedor = relationship("Empleado")
     factura_individual = relationship("FacturaIndividual", uselist=False, back_populates="venta")   
     
     def obtenerDatosVenta(self) -> dict:
@@ -200,6 +203,7 @@ class Venta(Base):
             "id_evento": self.id_evento,
             "fecha_venta": self.fecha_venta,
             "total": self.total,
+            "estado": self.estado,
             "cliente": {
                 "nombre": self.cliente.nombre if self.cliente else None,
                 "correo": self.cliente.correo if self.cliente else None,
@@ -211,6 +215,32 @@ class Venta(Base):
                 "fecha": self.evento.fecha_hora_inicio if self.evento else None
             } if self.evento else None
         }
+
+    def iniciarVenta(self):
+        self.estado = "Iniciada"
+
+    def agregarDetalle(self, articulo: "ArticuloDulceria", cant: int) -> "DetalleVenta":
+        self.estado = "EnCarga"
+        detalle = DetalleVenta(
+            id_venta=self.id_venta,
+            id_articulo=articulo.id_articulo,
+            cantidad=cant,
+            subtotal=0.0
+        )
+        detalle.articulo = articulo
+        detalle.calcularSubtotal()
+        return detalle
+
+    def calcularTotal(self, detalles: list["DetalleVenta"]) -> float:
+        self.total = sum(d.subtotal for d in detalles)
+        return self.total
+
+    def procesarPago(self) -> bool:
+        self.estado = "PendienteDePago"
+        return True # Se coordina externamente con Pago.autorizarPago()
+
+    def registrarVenta(self):
+        self.estado = "Finalizada"
 
 # ============================================================================
 # MÓDULO DE FACTURACIÓN
@@ -364,10 +394,228 @@ class FacturaPDF(Base):
         return self.archivo
 
 
-class ProductoDulceria(Base):
-    __tablename__ = "productos_dulceria"
-    id_producto = Column(Integer, primary_key=True, index=True, autoincrement=True)
+# ============================================================================
+# MÓDULO DE DULCERÍA Y LEALTAD (CU-05, CU-06)
+# ============================================================================
+
+class ArticuloDulceria(Base):
+    __tablename__ = "articulos_dulceria"
+    id_articulo = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
     precio = Column(Float, nullable=False)
-    stock_actual = Column(Integer, nullable=False)
-    stock_minimo = Column(Integer, default=10)
+    tipo_articulo = Column(String(50)) # Discriminador para herencia
+
+    __mapper_args__ = {
+        "polymorphic_identity": "articulo",
+        "polymorphic_on": tipo_articulo,
+    }
+    
+    def obtenerPrecio(self) -> float:
+        return self.precio
+
+class ProductoIndividual(ArticuloDulceria):
+    __tablename__ = "productos_individuales"
+    id_producto = Column(Integer, ForeignKey("articulos_dulceria.id_articulo"), primary_key=True)
+    
+    # Relación con la tabla asociativa de la receta
+    receta = relationship("RecetaInsumo", back_populates="producto", cascade="all, delete-orphan")
+
+    __mapper_args__ = {"polymorphic_identity": "producto_individual"}
+    
+    def obtenerReceta(self) -> list:
+        return self.receta
+
+class Combo(ArticuloDulceria):
+    __tablename__ = "combos_dulceria"
+    id_combo = Column(Integer, ForeignKey("articulos_dulceria.id_articulo"), primary_key=True)
+    
+    # Relación con la tabla asociativa de productos en el combo
+    productos_combo = relationship("ComboProducto", back_populates="combo", cascade="all, delete-orphan")
+
+    __mapper_args__ = {"polymorphic_identity": "combo"}
+    
+    def obtenerProductos(self) -> list:
+        return self.productos_combo
+
+class Insumo(Base):
+    __tablename__ = "insumos_dulceria"
+    id_insumo = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    nombre = Column(String(100), nullable=False)
+    stock_actual = Column(Float, nullable=False, default=0)
+    unidad_medida = Column(String(50), nullable=False) # Ej. "gramos", "vasos"
+
+    def validarDisponibilidad(self, cantRequerida: float) -> bool:
+        return self.stock_actual >= cantRequerida
+
+    def descontarStock(self, cant: float) -> None:
+        if self.validarDisponibilidad(cant):
+            self.stock_actual -= cant
+        else:
+            raise ValueError(f"Stock insuficiente de {self.nombre}")
+
+# Clases Asociativas (Necesarias para base de datos relacional)
+class RecetaInsumo(Base):
+    """Asociación Muchos a Muchos entre ProductoIndividual e Insumo"""
+    __tablename__ = "recetas_insumos"
+    id_producto = Column(Integer, ForeignKey("productos_individuales.id_producto"), primary_key=True)
+    id_insumo = Column(Integer, ForeignKey("insumos_dulceria.id_insumo"), primary_key=True)
+    cantidad_requerida = Column(Float, nullable=False)
+    
+    producto = relationship("ProductoIndividual", back_populates="receta")
+    insumo = relationship("Insumo")
+
+class ComboProducto(Base):
+    """Asociación Muchos a Muchos entre Combo y ProductoIndividual"""
+    __tablename__ = "combos_productos"
+    id_combo = Column(Integer, ForeignKey("combos_dulceria.id_combo"), primary_key=True)
+    id_producto = Column(Integer, ForeignKey("productos_individuales.id_producto"), primary_key=True)
+    cantidad = Column(Integer, nullable=False, default=1)
+    
+    combo = relationship("Combo", back_populates="productos_combo")
+    producto = relationship("ProductoIndividual")
+
+class DetalleVenta(Base):
+    __tablename__ = "detalles_ventas"
+    id_detalle = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_venta = Column(Integer, ForeignKey("ventas.id_venta"), nullable=False)
+    id_articulo = Column(Integer, ForeignKey("articulos_dulceria.id_articulo"), nullable=False)
+    cantidad = Column(Integer, nullable=False)
+    subtotal = Column(Float, nullable=False)
+
+    venta = relationship("Venta", backref="detalles_dulceria")
+    articulo = relationship("ArticuloDulceria")
+    
+    def calcularSubtotal(self) -> float:
+        if self.articulo:
+            self.subtotal = self.articulo.obtenerPrecio() * self.cantidad
+        return self.subtotal
+
+class Pago(Base):
+    __tablename__ = "pagos_dulceria"
+    id_pago = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_venta = Column(Integer, ForeignKey("ventas.id_venta"), nullable=False)
+    monto = Column(Float, nullable=False)
+    estado = Column(String(50), default="Aprobado")
+
+    venta = relationship("Venta", backref="pago")
+    
+    def autorizarPago(self) -> bool:
+        # Aquí podría ir validación con GestorPagosExterno
+        self.estado = "Aprobado"
+        return True
+
+class LogMovimiento(Base):
+    __tablename__ = "log_movimientos_inventario"
+    id_log = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_insumo = Column(Integer, ForeignKey("insumos_dulceria.id_insumo"), nullable=False)
+    accion = Column(String(200), nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+    insumo = relationship("Insumo")
+    
+    def guardarRegistro(self, db):
+        db.add(self)
+        db.commit()
+
+class Ticket(Base):
+    __tablename__ = "tickets_dulceria"
+    id_ticket = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_venta = Column(Integer, ForeignKey("ventas.id_venta"), unique=True, nullable=False)
+    folio_fiscal = Column(String(100), unique=True, nullable=False)
+    fecha_emision = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # NUEVO: Detalle de Monedero en Ticket (Diagrama 6 Secuencia CU-06)
+    saldo_anterior = Column(Integer, nullable=True)
+    movimiento_puntos = Column(Integer, nullable=True)
+    saldo_nuevo = Column(Integer, nullable=True)
+
+    venta = relationship("Venta", backref="ticket")
+
+    def generarPDF(self) -> str:
+        return f"/pdfs/ticket_{self.folio_fiscal}.pdf"
+
+    def generar(self, s1: int, mov: int, s2: int) -> None:
+        self.saldo_anterior = s1
+        self.movimiento_puntos = mov
+        self.saldo_nuevo = s2
+
+    def imprimir(self) -> None:
+        pass
+
+# ============================================================================
+# CU-06: GESTIONAR PUNTOS (MONEDERO)
+# ============================================================================
+
+class Monedero(Base):
+    __tablename__ = "monederos"
+    id_monedero = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), unique=True, nullable=False)
+    saldoPuntos = Column(Integer, default=0, nullable=False)
+    fechaVencimiento = Column(DateTime)
+    estado = Column(String(50), default="Operativa") # "Operativa", "Vencida", "Bloqueada"
+
+    # El Cliente "posee" 1 Monedero (backref crea la relación bidireccional sin tocar la clase Cliente)
+    cliente = relationship("Cliente", backref="monedero_obj")
+
+    def consultarSaldo(self) -> int:
+        return self.saldoPuntos
+
+    def validarSaldoSuficiente(self, monto: int) -> bool:
+        return self.saldoPuntos >= monto
+
+    def actualizarSaldo(self, monto: int, operacion: str) -> None:
+        if operacion == "Canje":
+            if self.validarSaldoSuficiente(monto):
+                self.saldoPuntos -= monto
+            else:
+                raise ValueError("Saldo de puntos insuficiente")
+        elif operacion == "Acumular":
+            self.saldoPuntos += monto
+
+    # Transiciones de Estado (Diagrama 7 Máquina de Estados CU-06)
+    def expirarPlazo(self) -> None:
+        self.estado = "Vencida"
+
+    def detectarIrregularidad(self) -> None:
+        self.estado = "Bloqueada"
+
+    def desbloquearCuenta(self) -> None:
+        self.estado = "Operativa"
+        self.saldoPuntos = 0
+
+    def reiniciarPuntos(self) -> None:
+        self.estado = "Operativa"
+        self.saldoPuntos = 0
+
+class TransaccionPuntos(Base):
+    __tablename__ = "transacciones_puntos"
+    idTransaccion = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_monedero = Column(Integer, ForeignKey("monederos.id_monedero"), nullable=False)
+    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+    monto = Column(Integer, nullable=False)
+    tipo = Column(String(50), nullable=False)
+
+    monedero = relationship("Monedero", backref="historial_transacciones")
+
+    def registrar(self, db, s1: int, mov: int, s2: int, ticket: Ticket = None) -> bool:
+        db.add(self)
+        
+        # Secuencia CU-06: TransaccionPuntos invoca escribirEntrada() y generar()
+        log = LogAuditoria()
+        operacion_txt = f"{self.tipo} de {self.monto} pts. Saldo: {s1} -> {s2}"
+        log.escribirEntrada(db, operacion_txt)
+        
+        if ticket:
+            ticket.generar(s1, mov, s2)
+            
+        return True
+
+class LogAuditoria(Base):
+    __tablename__ = "log_auditoria_monedero"
+    id_log = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    detalle = Column(String(255), nullable=False)
+    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def escribirEntrada(self, db, detalle_txt: str) -> None:
+        self.detalle = detalle_txt
+        db.add(self)
