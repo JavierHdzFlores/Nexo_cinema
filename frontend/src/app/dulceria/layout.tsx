@@ -1,200 +1,318 @@
 'use client';
 
+/**
+ * layout.tsx — DulceriaLayout
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Actúa como el CONTROLADOR principal del módulo (CU-05 + CU-06).
+ * Implementa la Máquina de Estados del Diagrama 6 (CU-05):
+ *   Iniciada → EnCarga → ValidandoStock → PendienteDePago → Finalizada / Cancelada
+ *
+ * Provee el CartContext con las funciones del GestorMonedero (CU-06).
+ * La estructura de carpetas sigue el patrón:
+ *   layout.tsx   → Controlador + Contexto + Shell visual
+ *   page.tsx     → Vista "Inicio" (artículos destacados)
+ *   [category]/  → Vista dinámica de catálogo por categoría
+ *   components/  → Componentes aislados y reutilizables
+ *   types.ts     → Contratos de tipos (schemas del backend)
+ */
+
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Film } from 'lucide-react';
+import type { OperacionMonedero } from './components/LoyaltyPanel';
 
+import { CartSummary } from './components/CartSummary';
+import { LoyaltyPanel } from './components/LoyaltyPanel';
+import { PaymentModal } from './components/PaymentModal';
 
-interface Item {
-  id_articulo: number;
-  nombre: string;
-  cantidad: number;
-  precio: number;
-  subtotal: number;
-}
+import type {
+  CartItem,
+  EstadoVenta,
+  VentaDulceriaRequest,
+  VentaDulceriaResponse,
+  MonederoSaldoResponse,
+} from './types';
 
-const CartContext = createContext<{
-  carrito: Item[];
+const API_URL = 'http://127.0.0.1:8000/dulceria';
+
+/* ─── Contexto del Carrito (accesible desde cualquier página hija) ─── */
+interface CartContextType {
+  carrito: CartItem[];
   agregarProducto: (id: number, nombre: string, precio: number) => void;
   restarProducto: (id: number) => void;
   eliminarProducto: (id: number) => void;
   limpiarCarrito: () => void;
-} | null>(null);
+}
+
+const CartContext = createContext<CartContextType | null>(null);
 
 export const useCart = () => {
-  const context = useContext(CartContext);
-  if (!context) throw new Error("useCart debe usarse dentro de CartProvider");
-  return context;
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error('useCart debe usarse dentro de DulceriaLayout');
+  return ctx;
 };
 
 
-export default function DulceriaLayout({ children }: { children: ReactNode }) {
-  const [carrito, setCarrito] = useState<Item[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const pathname = usePathname();
 
-  
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT PRINCIPAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+export default function DulceriaLayout({ children }: { children: ReactNode }) {
+
+
+  /* ── Carrito (estado EnCarga) ── */
+  const [carrito, setCarrito] = useState<CartItem[]>([]);
+
   const agregarProducto = (id: number, nombre: string, precio: number) => {
+    if (estadoVenta === 'Iniciada') setEstadoVenta('EnCarga');
     setCarrito(prev => {
       const existe = prev.find(i => i.id_articulo === id);
       if (existe) {
-        return prev.map(i => i.id_articulo === id 
-          ? { ...i, cantidad: i.cantidad + 1, subtotal: (i.cantidad + 1) * precio } 
-          : i
+        const nueva_cant = existe.cantidad + 1;
+        return prev.map(i =>
+          i.id_articulo === id
+            ? { ...i, cantidad: nueva_cant, subtotal: parseFloat((nueva_cant * precio).toFixed(2)) }
+            : i
         );
       }
-      return [...prev, { id_articulo: id, nombre, cantidad: 1, precio, subtotal: precio }];
+      return [...prev, { id_articulo: id, nombre, precio, cantidad: 1, subtotal: precio, tipo_articulo: '' }];
     });
   };
 
   const restarProducto = (id: number) => {
     setCarrito(prev => {
-      const existe = prev.find(i => i.id_articulo === id);
-      if (!existe) return prev;
-      
-      if (existe.cantidad > 1) {
-        return prev.map(i => i.id_articulo === id 
-          ? { ...i, cantidad: i.cantidad - 1, subtotal: (i.cantidad - 1) * i.precio } 
+      const item = prev.find(i => i.id_articulo === id);
+      if (!item) return prev;
+      if (item.cantidad === 1) return prev.filter(i => i.id_articulo !== id);
+      const nueva_cant = item.cantidad - 1;
+      return prev.map(i =>
+        i.id_articulo === id
+          ? { ...i, cantidad: nueva_cant, subtotal: parseFloat((nueva_cant * i.precio).toFixed(2)) }
           : i
-        );
-      }
-      return prev.filter(i => i.id_articulo !== id);
+      );
     });
   };
 
-  const eliminarProducto = (id: number) => {
+  const eliminarProducto = (id: number) =>
     setCarrito(prev => prev.filter(i => i.id_articulo !== id));
+
+  const limpiarCarrito = () => {
+    setCarrito([]);
+    if (estadoVenta === 'EnCarga') setEstadoVenta('Iniciada');
   };
 
-  const limpiarCarrito = () => setCarrito([]);
+  /* ── Monedero (CU-06: GestorMonedero) ── */
+  const [idCliente, setIdCliente] = useState<number | null>(null);
+  const [puntosDisponibles, setPuntosDisponibles] = useState(0);
+  const [operacion, setOperacion] = useState<OperacionMonedero>('acumular');
+  const [isConsultandoMonedero, setIsConsultandoMonedero] = useState(false);
+  const [errorCuenta, setErrorCuenta] = useState<string | null>(null);
 
-  const totalVenta = carrito.reduce((acc, item) => acc + item.subtotal, 0);
-
-  
-  const finalizarCompra = async () => {
-    if (carrito.length === 0) return;
-    setIsProcessing(true);
+  const handleValidarCuenta = async (id: string) => {
+    setIsConsultandoMonedero(true);
+    setErrorCuenta(null);
     try {
-      const res = await fetch('http://localhost:8000/dulceria/procesar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: carrito.map(i => ({ id_articulo: i.id_articulo, cantidad: i.cantidad }))
-        })
-      });
-      if (res.ok) {
-        alert(" Venta exitosa. Inventario actualizado.");
-        limpiarCarrito();
+      const res = await fetch(`${API_URL}/monedero/${id}/saldo`);
+      const data = await res.json();
+      if (res.status === 403) {
+        setErrorCuenta(data.detail || 'Cuenta inactiva. Contacte al administrador.');
+        return;
       }
-    } catch (e) {
-      alert("Error de comunicación con el servidor (dulceria.py)");
+      if (res.status === 404) {
+        setErrorCuenta('No existe un monedero para ese ID.');
+        return;
+      }
+      if (!res.ok) {
+        setErrorCuenta('Error al validar la cuenta.');
+        return;
+      }
+      setIdCliente(data.id_cliente);
+      setPuntosDisponibles(data.saldoPuntos);
+      setOperacion('acumular');
+    } catch {
+      setErrorCuenta('Error de conexión con el servidor.');
     } finally {
-      setIsProcessing(false);
+      setIsConsultandoMonedero(false);
     }
   };
 
+  const handleLimpiarCuenta = () => {
+    setIdCliente(null);
+    setPuntosDisponibles(0);
+    setOperacion('acumular');
+    setErrorCuenta(null);
+  };
+
+  /* ── Máquina de estados (Diagrama 6 CU-05) ── */
+  const [estadoVenta, setEstadoVenta] = useState<EstadoVenta>('Iniciada');
+  const [respuestaVenta, setRespuestaVenta] = useState<VentaDulceriaResponse | null>(null);
+
+  const subtotal = carrito.reduce((acc, i) => acc + i.subtotal, 0);
+  const descuentoPuntos = (operacion === 'canjear' && idCliente)
+    ? Math.min(puntosDisponibles, subtotal)
+    : 0;
+  const granTotal = Math.max(0, subtotal - descuentoPuntos);
+
+  /* Transición: EnCarga → ValidandoStock → PendienteDePago */
+  const handleSolicitarCobro = () => {
+    if (carrito.length === 0) return;
+    setEstadoVenta('ValidandoStock');
+    // Simulación del tiempo de validación de inventario (Requerimiento: < 2 segundos)
+    setTimeout(() => setEstadoVenta('PendienteDePago'), 900);
+  };
+
+  /* Transición: PendienteDePago → Pagada → Finalizada (POST /dulceria/vender) */
+  const handleProcesarPago = async () => {
+    // La API centraliza todo, pero a nivel UI pasamos por "Pagada" si tiene éxito
+    setEstadoVenta('PendienteDePago');
+
+    const body: VentaDulceriaRequest = {
+      id_cliente: idCliente ?? undefined,
+      usar_puntos: operacion === 'canjear',
+      puntos_a_usar: descuentoPuntos,
+      detalles: carrito.map(i => ({ id_articulo: i.id_articulo, cantidad: i.cantidad })),
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/vender`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data: VentaDulceriaResponse = await res.json();
+
+      if (res.ok) {
+        setEstadoVenta('Pagada');
+        
+        // Simulación rápida de emisión de ticket (Diagrama 6: Pagada -> Finalizada)
+        setTimeout(() => {
+          setRespuestaVenta(data);
+          setEstadoVenta('Finalizada');
+          // Actualizar saldo local con el comprobante devuelto por el backend
+          if (idCliente && data.monedero) {
+            setPuntosDisponibles(data.monedero.saldo_nuevo);
+          }
+        }, 800);
+      } else {
+        alert(`Error del sistema: ${data}`);
+        setEstadoVenta('EnCarga'); // E1 / E2: volver para corregir la orden
+      }
+    } catch {
+      alert('Error de conexión. Intente nuevamente.');
+      setEstadoVenta('PendienteDePago');
+    }
+  };
+
+  /* Transición: Finalizada / Cancelada → Iniciada (nueva venta) */
+  const handleResetVenta = () => {
+    setCarrito([]);
+    setOperacion('acumular');
+    setEstadoVenta('Iniciada');
+    setRespuestaVenta(null);
+  };
+
+  /* ─────────────────────────────────────────────────────────── RENDER ─── */
   return (
     <CartContext.Provider value={{ carrito, agregarProducto, restarProducto, eliminarProducto, limpiarCarrito }}>
-      <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans">
-        
-        
-        <main className="max-w-[1800px] mx-auto grid lg:grid-cols-12 gap-0">
-          
-      
-          <section className="lg:col-span-8 p-10 border-r border-zinc-900 min-h-[calc(100vh-80px)]">
-            <nav className="flex gap-10 mb-12 border-b border-zinc-900">
-              {[
-                { name: 'Inicio', path: '/dulceria' },
-                { name: 'Combos', path: '/dulceria/combos' },
-                { name: 'Palomitas', path: '/dulceria/palomitas' },
-                { name: 'Bebidas', path: '/dulceria/bebidas' },
-                { name: 'Snacks', path: '/dulceria/snacks' },
+      <div className="min-h-screen text-white" style={{ background: '#080b14' }}>
 
-              ].map((cat) => (
-                <Link 
-                  key={cat.path} 
-                  href={cat.path}
-                  className={`pb-4 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
-                    pathname === cat.path ? 'text-red-600 border-b-2 border-red-600' : 'text-zinc-500 hover:text-zinc-200'
-                  }`}
-                >
-                  {cat.name}
-                </Link>
-              ))}
-            </nav>
+        {/* ═════════ HEADER ═════════ */}
+        <header
+          className="sticky top-0 z-40 border-b border-white/[0.06]"
+          style={{ background: 'rgba(8,11,20,0.95)', backdropFilter: 'blur(20px)' }}
+        >
+          <div className="max-w-[1800px] mx-auto px-8 h-16 flex items-center justify-between gap-8">
 
-            <div className="animate-in fade-in slide-in-from-left-4 duration-700">
+            {/* Logo / Breadcrumb */}
+            <Link href="/" className="flex items-center gap-2.5 shrink-0">
+              <div
+                className="w-7 h-7 rounded-md flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)' }}
+              >
+                <Film size={14} className="text-white" />
+              </div>
+              <span
+                className="text-white tracking-widest select-none"
+                style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', letterSpacing: '0.12em' }}
+              >
+                NEXO CINEMA
+              </span>
+              <span className="text-white/20 text-sm font-light">/</span>
+              <span className="text-white/40 text-sm font-medium">Dulcería</span>
+            </Link>
+
+            {/* Panel Monedero (CU-06 inline en header) */}
+            <div className="flex-1 max-w-xl">
+              <LoyaltyPanel
+                idCliente={idCliente}
+                puntosDisponibles={puntosDisponibles}
+                operacion={operacion}
+                setOperacion={setOperacion}
+                onValidarCuenta={handleValidarCuenta}
+                onLimpiarCuenta={handleLimpiarCuenta}
+                isLoading={isConsultandoMonedero}
+                errorCuenta={errorCuenta}
+              />
+            </div>
+
+            {/* Indicador de estado de la venta */}
+            <div className="shrink-0 flex items-center gap-2">
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{
+                  background: estadoVenta === 'Iniciada' ? 'rgba(255,255,255,0.15)'
+                    : estadoVenta === 'EnCarga' ? '#f9a825'
+                    : estadoVenta === 'Finalizada' ? '#22c55e'
+                    : '#ff4e50',
+                }}
+              />
+              <span className="text-[10px] font-medium uppercase tracking-widest text-white/30">
+                {estadoVenta}
+              </span>
+            </div>
+
+          </div>
+        </header>
+
+        {/* ═════════ BODY ═════════ */}
+        <div className="max-w-[1800px] mx-auto flex">
+
+          {/* IZQUIERDA: Navegación + Contenido */}
+          <main className="flex-1 min-w-0">
+
+
+
+            {/* Contenido de la ruta activa */}
+            <div className="p-8">
               {children}
             </div>
-          </section>
+          </main>
 
-          
-          <aside className="lg:col-span-4 p-10 bg-[#080808] h-[calc(100vh-80px)] sticky top-20 flex flex-col">
-            <div className="flex justify-between items-center mb-10 border-b border-zinc-900 pb-4">
-              <h2 className="text-3xl font-black italic uppercase tracking-tighter">Ticket</h2>
-              <button 
-                onClick={limpiarCarrito}
-                className="text-[10px] font-black text-zinc-600 hover:text-red-600 uppercase tracking-widest transition-colors"
-              >
-                Limpiar Orden
-              </button>
-            </div>
+          {/* DERECHA: Ticket / CartSummary */}
+          <CartSummary
+            items={carrito}
+            total={subtotal}
+            descuentoPuntos={descuentoPuntos}
+            granTotal={granTotal}
+            usarPuntos={operacion === 'canjear'}
+            onAdd={agregarProducto}
+            onSubtract={restarProducto}
+            onClearCart={limpiarCarrito}
+            onCheckout={handleSolicitarCobro}
+          />
+        </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-hide">
-              {carrito.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center opacity-10">
-                  <span className="text-8xl mb-4">🛒</span>
-                  <p className="font-black uppercase tracking-widest">Sin artículos</p>
-                </div>
-              ) : (
-                carrito.map((item) => (
-                  <div key={item.id_articulo} className="flex justify-between items-center group animate-in slide-in-from-right-4">
-                    <div className="flex-1 pr-4">
-                      <div className="flex items-center gap-3">
-                         <span className="text-red-600 font-mono font-bold">{item.cantidad}x</span>
-                         <h4 className="text-sm font-black uppercase text-zinc-200 truncate max-w-[150px]">{item.nombre}</h4>
-                      </div>
-                      <div className="flex gap-4 mt-1">
-                        <button 
-                          onClick={() => restarProducto(item.id_articulo)}
-                          className="text-[9px] font-black uppercase text-zinc-500 hover:text-red-500 transition-colors"
-                        >
-                          Reducir 
-                        </button>
-                        <button 
-                          onClick={() => eliminarProducto(item.id_articulo)}
-                          className="text-[9px] font-black uppercase text-zinc-700 hover:text-red-600 transition-colors"
-                        >
-                          Quitar 
-                        </button>
-                      </div>
-                    </div>
-                    <span className="font-mono font-bold text-lg text-white">${item.subtotal.toFixed(2)}</span>
-                  </div>
-                ))
-              )}
-            </div>
+        {/* ═════════ MODAL DE PAGO (Máquina de estados) ═════════ */}
+        <PaymentModal
+          estado={estadoVenta}
+          total={subtotal}
+          descuentoPuntos={descuentoPuntos}
+          granTotal={granTotal}
+          respuesta={respuestaVenta}
+          onConfirmarPago={handleProcesarPago}
+          onCancelar={handleResetVenta}
+        />
 
-            <div className="mt-auto pt-8 border-t border-zinc-900">
-              <div className="flex justify-between items-end mb-8">
-                <span className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">Subtotal</span>
-                <span className="text-5xl font-black text-white italic tracking-tighter font-mono">${totalVenta.toFixed(2)}</span>
-              </div>
-
-              <button 
-                onClick={finalizarCompra}
-                disabled={carrito.length === 0 || isProcessing}
-                className={`w-full py-6 rounded-[2rem] font-black uppercase tracking-[0.3em] text-xs transition-all ${
-                  carrito.length > 0 && !isProcessing
-                  ? 'bg-white text-black hover:bg-red-600 hover:text-white shadow-[0_20px_50px_rgba(255,255,255,0.05)] active:scale-[0.95]'
-                  : 'bg-zinc-900 text-zinc-700 cursor-not-allowed border border-zinc-800'
-                }`}
-              >
-                {isProcessing ? 'Sincronizando...' : 'Procesar Venta'}
-              </button>
-            </div>
-          </aside>
-        </main>
       </div>
     </CartContext.Provider>
   );
