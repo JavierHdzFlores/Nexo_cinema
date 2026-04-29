@@ -116,3 +116,30 @@ class VentaDulceriaResponse(BaseModel):
     mensaje: str
     # CU-06: Comprobante de monedero (Optional — solo si hubo cliente identificado)
     monedero: Optional[MovimientoMonederoResponse] = None
+# Representa el Diagrama de Clases con Responsabilidades (Entrada)
+class VentaTaquillaRequest(BaseModel):
+    id_taquillero: int
+    id_evento: int  
+    ids_asientos: list[int]
+    metodo_pago: str
+
+# Representa el Diagrama de Comunicación (Salida)
+class VentaTaquillaResponse(BaseModel):
+    id_venta: int
+    id_empleado: int
+    fecha_venta: datetime
+    total: float
+    metodo_pago: str
+
+    class Config:
+        from_attributes = True
+
+# Para listar funciones en la cartelera del taquillero
+class FuncionTaquillaResponse(BaseModel):
+    id: int
+    pelicula: str
+    fecha_hora_inicio: datetime
+    precio_boleto: float
+
+    class Config:
+        from_attributes = True

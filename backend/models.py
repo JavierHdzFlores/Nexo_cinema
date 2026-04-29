@@ -241,6 +241,34 @@ class Venta(Base):
 
     def registrarVenta(self):
         self.estado = "Finalizada"
+# Agrégalo debajo de la clase Venta
+class Funcion(Base):
+    __tablename__ = "funciones"
+    id_funcion = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_proyeccion = Column(Integer, ForeignKey("proyecciones_publicas.id_proyeccion"))
+    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
+    horario = Column(DateTime)
+    
+    # Relaciones
+    asientos = relationship("Asiento", back_populates="funcion")
+
+class Asiento(Base):
+    __tablename__ = "asientos"
+    id_asiento = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_funcion = Column(Integer, ForeignKey("funciones.id_funcion"))
+    numero = Column(String(10))
+    estado = Column(String(20), default="disponible") # disponible, bloqueado, ocupado
+    
+    funcion = relationship("Funcion", back_populates="asientos")
+
+class Boleto(Base):
+    __tablename__ = "boletos"
+    id_boleto = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_venta = Column(Integer, ForeignKey("ventas.id_venta"))
+    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"))
+    id_funcion = Column(Integer, ForeignKey("funciones.id_funcion"))
+    
+    venta = relationship("Venta")
 
 # ============================================================================
 # MÓDULO DE FACTURACIÓN
