@@ -68,6 +68,14 @@ class GerenteCreate(BaseModel):
     password: str
     matricula: str
 
+class ClienteCreate(BaseModel):
+    nombre: str
+    correo: str
+    password: str
+    rfc: Optional[str] = None
+    codigo_postal= Optional[str] = None
+    
+
 # ==========================================
 # ESQUEMAS PARA DULCERÍA Y LEALTAD (CU-05, CU-06)
 # ==========================================
@@ -108,9 +116,3 @@ class VentaDulceriaResponse(BaseModel):
     mensaje: str
     # CU-06: Comprobante de monedero (Optional — solo si hubo cliente identificado)
     monedero: Optional[MovimientoMonederoResponse] = None
-class ClientCreate(BaseModel):
-    nombre: str
-    correo: str
-    password: str
-    rfc:Optional[str]=None        ##EL RFC PUEDE SER OPCIONAL
-    codigo_postal: Optional[str]=None       #EL CODIGO POSTAL SE VUELVE OPCIOBNAL 
