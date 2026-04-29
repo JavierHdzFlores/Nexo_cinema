@@ -67,3 +67,10 @@ class GerenteCreate(BaseModel):
     correo: str
     password: str
     matricula: str
+
+class ClientCreate(BaseModel):
+    nombre: str
+    correo: str
+    password: str
+    rfc:Optional[str]=None        ##EL RFC PUEDE SER OPCIONAL
+    codigo_postal: Optional[str]=None       #EL CODIGO POSTAL SE VUELVE OPCIOBNAL 
