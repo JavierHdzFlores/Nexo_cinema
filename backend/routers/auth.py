@@ -39,6 +39,7 @@ router = APIRouter(
     tags=["Autenticación"]
 )
 
+#login para staff
 @router.post("/login", response_model=schemas.TokenResponse)
 def login_staff(credenciales: schemas.LoginRequest, db: Session = Depends(get_db)):
     # 1. Buscamos al usuario por correo
@@ -93,3 +94,43 @@ def login_staff(credenciales: schemas.LoginRequest, db: Session = Depends(get_db
         "tipo_usuario": usuario.tipo_usuario,
         "puesto": puesto_staff
     }
+
+##login para clientes 
+
+@router.post("/login/cliente", response_model=schemas.TokenResponse)
+def login_cliente(credenciales: schemas.LoginRequest, db: Session = Depends(get_db)):
+    #buscamos al usuario por su correo
+    usuario  = db.query(Usuario).filter(Usuario.correo == credenciales.correo).first()
+    #verificamos si el usuario existe y la contra es correcta
+    if not usuario or not pwd_context.verify(credenciales.password, usuario.password):
+        raise HTTPException(
+            status_code = status.HTTP_401_UNAUTHORIZED,
+            detail = "Correo y/o contraseña incorrecta" 
+        )
+    if usuario.tipo_usuario != "cliente":
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            details = "Este portal es exclusivo para clientes. Si formas parte del staff debes iniciar seccion en el panel administrativo" 
+        )
+    
+    #generamos el jwt para el cliente
+    access_token_expires = timedelta(minutes= ACCESS_TOKEN_EXPIRE_MINUTES)
+    token_data={
+        "sub": str(usuario.id_usuario),
+        "tipo": usuario.tipo_usuario
+    }
+
+    access_token =crear_token_acceso(
+        data=token_data,
+        expires_delta=access_token_expires
+    )
+    #regresar los datos 
+    return{
+        "access_token": access_token,
+        "token_type": "bearer",
+        "usuario_id": usuario.id_usuario,
+        "nombre": usuario.nombre,
+        "tipo_usuario": usuario.tipo_usuario,
+        "puesto": None
+    }
+

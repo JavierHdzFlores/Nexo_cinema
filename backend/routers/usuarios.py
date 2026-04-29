@@ -77,7 +77,7 @@ def crear_cliente(cliente: schemas.ClienteCreate, db: Session=Depends(get_db)):
     if usuario_existe:
         raise HTTPException(status_code=400, detail="El correo ya esta registrado, inicie sección o revise su correo")
     #instanciamos cliente con COntraseña encriptada
-    nuevo_cliente = cliente(
+    nuevo_cliente = Cliente(
         nombre=cliente.nombre,
         correo=cliente.correo,
         password= get_password_hash(cliente.password),
