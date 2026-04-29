@@ -42,3 +42,6 @@ next-env.d.ts
 
 #no agregen su entorno virtual 
 venv/
+env/
+# Variables de entorno
+.env
