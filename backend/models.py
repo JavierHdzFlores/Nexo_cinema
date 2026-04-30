@@ -207,95 +207,52 @@ class EventoPrivado(Evento):
     __mapper_args__ = {"polymorphic_identity": "evento_privado"}
 
 
+# ==========================================
+# ACTUALIZACIÓN EN LA TABLA VENTA
+# ==========================================
 class Venta(Base):
     __tablename__ = "ventas"
     id_venta = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), nullable=True)
     id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=True)
+    id_empleado = Column(Integer, ForeignKey("empleados.id_empleado"), nullable=True) # NUEVO
     fecha_venta = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     total = Column(Float, nullable=False)
-    estado = Column(String(50), default="Iniciada")
-    id_empleado = Column(Integer, ForeignKey("empleados.id_empleado"), nullable=True)
+    metodo_pago = Column(String(50), nullable=False) # NUEVO: Efectivo, Tarjeta, etc.
+    estado = Column(String(20), default="Completada") # NUEVO
     
-    # Relaciones actualizadas a back_populates
     cliente = relationship("Cliente", back_populates="ventas")
     evento = relationship("Evento", back_populates="ventas")
-    vendedor = relationship("Empleado")
     factura_individual = relationship("FacturaIndividual", uselist=False, back_populates="venta")   
-    
-    def obtenerDatosVenta(self) -> dict:
-        return {
-            "id_venta": self.id_venta,
-            "id_cliente": self.id_cliente,
-            "id_evento": self.id_evento,
-            "fecha_venta": self.fecha_venta,
-            "total": self.total,
-            "estado": self.estado,
-            "cliente": {
-                "nombre": self.cliente.nombre if self.cliente else None,
-                "correo": self.cliente.correo if self.cliente else None,
-                "rfc": self.cliente.rfc if self.cliente else None
-            } if self.cliente else None,
-            "evento": {
-                "nombre": self.evento.nombre if self.evento else None,
-                "tipo": self.evento.tipo_evento if self.evento else None,
-                "fecha": self.evento.fecha_hora_inicio if self.evento else None
-            } if self.evento else None
-        }
+    boletos = relationship("Boleto", back_populates="venta") # NUEVO
 
-    def iniciarVenta(self):
-        self.estado = "Iniciada"
-
-    def agregarDetalle(self, articulo: "ArticuloDulceria", cant: int) -> "DetalleVenta":
-        self.estado = "EnCarga"
-        detalle = DetalleVenta(
-            id_venta=self.id_venta,
-            id_articulo=articulo.id_articulo,
-            cantidad=cant,
-            subtotal=0.0
-        )
-        detalle.articulo = articulo
-        detalle.calcularSubtotal()
-        return detalle
-
-    def calcularTotal(self, detalles: list["DetalleVenta"]) -> float:
-        self.total = sum(d.subtotal for d in detalles)
-        return self.total
-
-    def procesarPago(self) -> bool:
-        self.estado = "PendienteDePago"
-        return True # Se coordina externamente con Pago.autorizarPago()
-
-    def registrarVenta(self):
-        self.estado = "Finalizada"
-# Agrégalo debajo de la clase Venta
-class Funcion(Base):
-    __tablename__ = "funciones"
-    id_funcion = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_proyeccion = Column(Integer, ForeignKey("proyecciones_publicas.id_proyeccion"))
-    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
-    horario = Column(DateTime)
-    
-    # Relaciones
-    asientos = relationship("Asiento", back_populates="funcion")
-
+# ==========================================
+# NUEVAS TABLAS: ASIENTO Y BOLETO (CU-04)
+# ==========================================
 class Asiento(Base):
     __tablename__ = "asientos"
     id_asiento = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_funcion = Column(Integer, ForeignKey("funciones.id_funcion"))
-    numero = Column(String(10))
-    estado = Column(String(20), default="disponible") # disponible, bloqueado, ocupado
+    id_sala = Column(Integer, ForeignKey("salas.id_sala"), nullable=False)
+    numero = Column(String(10), nullable=False) # Ej: A1, G5
     
-    funcion = relationship("Funcion", back_populates="asientos")
+    sala = relationship("Sala")
 
 class Boleto(Base):
     __tablename__ = "boletos"
     id_boleto = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_venta = Column(Integer, ForeignKey("ventas.id_venta"))
-    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"))
-    id_funcion = Column(Integer, ForeignKey("funciones.id_funcion"))
+    id_venta = Column(Integer, ForeignKey("ventas.id_venta"), nullable=False)
+    id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=False)
+    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"), nullable=False)
+    precio_final = Column(Float, nullable=False)
     
-    venta = relationship("Venta")
+    venta = relationship("Venta", back_populates="boletos")
+    evento = relationship("Evento")
+    asiento = relationship("Asiento")
+
+    # REGLA DE NEGOCIO: Evitar duplicidad de asientos en tiempo real
+    __table_args__ = (
+        UniqueConstraint('id_evento', 'id_asiento', name='uix_evento_asiento'),
+    )
 
 # ============================================================================
 # MÓDULO DE FACTURACIÓN
@@ -781,6 +738,32 @@ class ReporteVentas(Base):
         # Lógica para calcular rentabilidad
         return 0.0
 
+
 # ============================================================================
-# MÓDULO DE CARTELERTA  CU-01
+# COTIZACION
 # ============================================================================
+class Cotizacion(Base):
+    """
+    CU-03: Almacena las cotizaciones de eventos corporativos.
+    No reserva la sala hasta que se pague.
+    """
+    __tablename__ = "cotizaciones"
+    id_cotizacion = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    nombre_cliente = Column(String(100), nullable=False)
+    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
+    fecha_hora_inicio = Column(DateTime, nullable=False)
+    fecha_hora_fin = Column(DateTime, nullable=False)
+    asistentes = Column(Integer, nullable=False)
+    paquete_dulceria = Column(String(100))
+    
+    # Costos desglosados
+    costo_sala = Column(Float, nullable=False)
+    costo_dulceria = Column(Float, nullable=False)
+    total = Column(Float, nullable=False)
+    
+    fecha_emision = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_vigencia = Column(DateTime, nullable=False)
+    estado = Column(String(20), default="Pendiente") # Pendiente, Pagada, Vencida
+
+    # Relación para poder acceder a los datos de la sala
+    sala = relationship("Sala")

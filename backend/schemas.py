@@ -159,23 +159,22 @@ class VentaDulceriaResponse(BaseModel):
     mensaje: str
     # CU-06: Comprobante de monedero (Optional — solo si hubo cliente identificado)
     monedero: Optional[MovimientoMonederoResponse] = None
-# Representa el Diagrama de Clases con Responsabilidades (Entrada)
+# ==========================================
+# ESQUEMAS PARA TAQUILLA (CU-04)
+# ==========================================
 class VentaTaquillaRequest(BaseModel):
-    id_taquillero: int
-    id_evento: int  
+    id_evento: int
     ids_asientos: list[int]
     metodo_pago: str
+    id_taquillero: Optional[int] = None
+    id_cliente: Optional[int] = None
 
-# Representa el Diagrama de Comunicación (Salida)
 class VentaTaquillaResponse(BaseModel):
     id_venta: int
-    id_empleado: int
-    fecha_venta: datetime
     total: float
-    metodo_pago: str
-
-    class Config:
-        from_attributes = True
+    estado: str
+    mensaje: str
+    boletos_generados: int
 
 # Para listar funciones en la cartelera del taquillero
 class FuncionTaquillaResponse(BaseModel):
@@ -201,3 +200,15 @@ class EventoPrivadoCreate(BaseModel):
     req_catering: bool = False
     req_iluminacion: bool = False
     costo_base_hora: float = 1000.0  # El precio que le cobren por hora a la sala
+
+# ==========================================
+# ESQUEMAS PARA COTIZACIONES (CU-03)
+# ==========================================
+class CotizacionCreate(BaseModel):
+    nombre_cliente: str
+    id_sala: int
+    fecha_hora_inicio: datetime
+    fecha_hora_fin: datetime
+    asistentes: int
+    paquete_dulceria: str  # Ej: "Basico", "Premium", "VIP"
+    costo_base_hora: float = 1000.0 # Precio de la sala por hora
