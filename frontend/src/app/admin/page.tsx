@@ -3,7 +3,10 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { motion } from 'motion/react';
+import { Film, FileText, BarChart3 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<'factura' | 'ventas'>('factura');
@@ -105,120 +108,156 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-6">
-      {/* Header */}
-      <div className="text-center max-w-3xl mb-10">
-        <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-red-600 mb-6">
-          Nexo Cinema
-        </h1>
-        <p className="text-xl text-gray-300 mb-10">
-          Panel de Administración - Finanzas y Reportes
-        </p>
-      </div>
-
-      {/* Secciones Principales */}
-      <div className="w-full max-w-4xl">
-        <div className="flex justify-center mb-8">
-          <button
-            onClick={() => setActiveSection('factura')}
-            className={`px-6 py-3 mx-2 rounded-lg font-semibold transition-all duration-300 ${
-              activeSection === 'factura'
-                ? 'bg-red-600 text-white shadow-lg'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            📄 Generar Factura
-          </button>
-          <button
-            onClick={() => setActiveSection('ventas')}
-            className={`px-6 py-3 mx-2 rounded-lg font-semibold transition-all duration-300 ${
-              activeSection === 'ventas'
-                ? 'bg-red-600 text-white shadow-lg'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            📊 Consultar Ventas
-          </button>
+    <div className="min-h-screen text-white font-sans selection:bg-[#ff4e50] selection:text-white" style={{ background: '#080b14' }}>
+      {/* ═════════ HEADER ═════════ */}
+      <header
+        className="sticky top-0 z-40 border-b border-white/[0.06]"
+        style={{ background: 'rgba(8,11,20,0.95)', backdropFilter: 'blur(20px)' }}
+      >
+        <div className="max-w-[1800px] mx-auto px-8 h-16 flex items-center justify-between gap-8">
+          <Link href="/" className="flex items-center gap-2.5 shrink-0">
+            <div
+              className="w-7 h-7 rounded-md flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)' }}
+            >
+              <Film size={14} className="text-white" />
+            </div>
+            <span
+              className="text-white tracking-widest select-none"
+              style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', letterSpacing: '0.12em' }}
+            >
+              NEXO CINEMA
+            </span>
+            <span className="text-white/20 text-sm font-light">/</span>
+            <span className="text-white/40 text-sm font-medium">Panel de Administración</span>
+          </Link>
         </div>
+      </header>
+
+      {/* ═════════ BODY ═════════ */}
+      <main className="max-w-4xl mx-auto px-6 py-12">
+        {/* Titulo */}
+        <div className="mb-10 text-center">
+          <h1
+            className="text-4xl md:text-5xl font-semibold text-white mb-2"
+            style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: '0.05em' }}
+          >
+            Finanzas y Reportes
+          </h1>
+          <p className="text-white/40 font-light">
+            Administración centralizada de facturación y análisis de ventas.
+          </p>
+        </div>
+
+        {/* ── Tabs de filtro instantáneo (Section) ── */}
+        <nav className="flex items-center gap-1 p-1 rounded-xl w-fit mx-auto mb-8"
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          {[
+            { id: 'factura', label: 'Generar Factura', icon: FileText },
+            { id: 'ventas', label: 'Consultar Ventas', icon: BarChart3 }
+          ].map(sec => {
+            const isActive = activeSection === sec.id;
+            const Icon = sec.icon;
+            return (
+              <button
+                key={sec.id}
+                onClick={() => { setActiveSection(sec.id as any); setMensaje(''); }}
+                className="relative px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                style={{ color: isActive ? '#000' : 'rgba(255,255,255,0.4)' }}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="admin-section-pill"
+                    className="absolute inset-0 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)' }}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
+                  />
+                )}
+                <Icon size={16} className="relative z-10" />
+                <span className="relative z-10">{sec.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
         {/* Contenido de Generar Factura */}
         {activeSection === 'factura' && (
-          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg">
+          <div 
+            className="p-8 rounded-2xl"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+          >
             {/* Sub-tabs para tipos de factura */}
-            <div className="flex justify-center mb-6">
-              <button
-                onClick={() => setActiveTab('individual')}
-                className={`px-4 py-2 mx-2 rounded-lg font-medium transition-all duration-300 ${
-                  activeTab === 'individual'
-                    ? 'bg-red-500 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                Factura Individual
-              </button>
-              <button
-                onClick={() => setActiveTab('evento')}
-                className={`px-4 py-2 mx-2 rounded-lg font-medium transition-all duration-300 ${
-                  activeTab === 'evento'
-                    ? 'bg-red-500 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                Factura de Evento
-              </button>
+            <div className="flex gap-4 mb-8 border-b border-white/10 pb-4">
+              {[
+                { id: 'individual', label: 'Factura Individual' },
+                { id: 'evento', label: 'Factura de Evento' }
+              ].map(tab => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => { setActiveTab(tab.id as any); setMensaje(''); }}
+                    className={`text-sm font-medium tracking-wide transition-colors ${
+                      isActive ? 'text-[#ff4e50]' : 'text-white/40 hover:text-white/60'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Formulario Individual */}
             {activeTab === 'individual' && (
-              <div>
-                <h2 className="text-2xl font-bold mb-4 text-red-400">Crear Factura Individual</h2>
-                <p className="text-gray-400 mb-6">Genera facturas para servicios específicos</p>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                <h2 className="text-xl font-medium text-white mb-2">Crear Factura Individual</h2>
+                <p className="text-sm text-white/40 mb-8">Genera facturas para servicios específicos de clientes.</p>
 
-                <form onSubmit={handleCreateIndividual} className="space-y-4">
+                <form onSubmit={handleCreateIndividual} className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-red-300 mb-1">Tipo de Servicio *</label>
+                    <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">Tipo de Servicio *</label>
                     <input
                       type="text"
                       value={individual.tipo_servicio}
                       onChange={(e) => setIndividual({ ...individual, tipo_servicio: e.target.value })}
                       placeholder="Ej: Entrada VIP, Combo Dulcería, Operación..."
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
                       required
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-red-300 mb-1">ID Cliente (opcional)</label>
+                      <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Cliente (opcional)</label>
                       <input
                         type="number"
                         value={individual.id_cliente}
                         onChange={(e) => setIndividual({ ...individual, id_cliente: e.target.value })}
-                        placeholder="ID del cliente"
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Ej. 101"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-red-300 mb-1">ID Venta (opcional)</label>
+                      <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Venta (opcional)</label>
                       <input
                         type="number"
                         value={individual.id_venta}
                         onChange={(e) => setIndividual({ ...individual, id_venta: e.target.value })}
-                        placeholder="ID de la venta"
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Ej. 505"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-red-300 mb-1">ID Gerente *</label>
+                    <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Gerente *</label>
                     <input
                       type="number"
                       value={individual.id_gerente}
                       onChange={(e) => setIndividual({ ...individual, id_gerente: e.target.value })}
                       placeholder="ID del gerente autorizado"
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
                       required
                     />
                   </div>
@@ -226,57 +265,54 @@ export default function AdminPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-300 ${
-                      loading
-                        ? 'bg-gray-600 cursor-not-allowed'
-                        : 'bg-red-600 hover:bg-red-700 text-white shadow-lg'
-                    }`}
+                    className="w-full py-3.5 px-6 rounded-xl font-medium tracking-wide text-[#080b14] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                    style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)' }}
                   >
-                    {loading ? 'Generando...' : 'Crear Factura Individual'}
+                    {loading ? 'Procesando...' : 'Emitir Factura Individual'}
                   </button>
                 </form>
-              </div>
+              </motion.div>
             )}
 
             {/* Formulario Evento */}
             {activeTab === 'evento' && (
-              <div>
-                <h2 className="text-2xl font-bold mb-4 text-red-400">Crear Factura de Evento</h2>
-                <p className="text-gray-400 mb-6">Facturación para proyecciones y eventos privados</p>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                <h2 className="text-xl font-medium text-white mb-2">Crear Factura de Evento</h2>
+                <p className="text-sm text-white/40 mb-8">Facturación para proyecciones y eventos privados.</p>
 
-                <form onSubmit={handleCreateEvento} className="space-y-4">
+                <form onSubmit={handleCreateEvento} className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-red-300 mb-1">ID Evento *</label>
+                    <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Evento *</label>
                     <input
                       type="number"
                       value={evento.id_evento}
                       onChange={(e) => setEvento({ ...evento, id_evento: e.target.value })}
-                      placeholder="ID del evento"
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="Ej. 10"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
                       required
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-red-300 mb-1">ID Cliente (opcional)</label>
+                      <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Cliente (opcional)</label>
                       <input
                         type="number"
                         value={evento.id_cliente}
                         onChange={(e) => setEvento({ ...evento, id_cliente: e.target.value })}
-                        placeholder="ID del cliente"
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Ej. 101"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-red-300 mb-1">ID Gerente *</label>
+                      <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Gerente *</label>
                       <input
                         type="number"
                         value={evento.id_gerente}
                         onChange={(e) => setEvento({ ...evento, id_gerente: e.target.value })}
                         placeholder="ID del gerente autorizado"
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
                         required
                       />
                     </div>
@@ -285,44 +321,52 @@ export default function AdminPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-300 ${
-                      loading
-                        ? 'bg-gray-600 cursor-not-allowed'
-                        : 'bg-red-600 hover:bg-red-700 text-white shadow-lg'
-                    }`}
+                    className="w-full py-3.5 px-6 rounded-xl font-medium tracking-wide text-[#080b14] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                    style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)' }}
                   >
-                    {loading ? 'Generando...' : 'Crear Factura de Evento'}
+                    {loading ? 'Procesando...' : 'Emitir Factura de Evento'}
                   </button>
                 </form>
-              </div>
+              </motion.div>
             )}
           </div>
         )}
 
         {/* Contenido de Consultar Ventas */}
         {activeSection === 'ventas' && (
-          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg text-center">
-            <h2 className="text-2xl font-bold mb-4 text-red-400">Consultar Ventas</h2>
-            <p className="text-gray-400 mb-6">Módulo en desarrollo - Próximamente disponible</p>
-            <div className="text-6xl mb-4">📊</div>
-            <p className="text-gray-500">Aquí podrás consultar y analizar todas las ventas realizadas en el sistema.</p>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} 
+            animate={{ opacity: 1, scale: 1 }}
+            className="p-12 rounded-2xl flex flex-col items-center justify-center text-center mt-8"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+          >
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <BarChart3 size={32} className="text-white/40" />
+            </div>
+            <h2 className="text-2xl font-medium text-white mb-2">Consultar Ventas</h2>
+            <p className="text-white/40 max-w-md">
+              Módulo en desarrollo. Próximamente podrás consultar y analizar todas las ventas realizadas en el sistema con gráficas y exportación.
+            </p>
+          </motion.div>
         )}
 
         {/* Mensaje */}
         {mensaje && (
-          <div
-            className={`mt-6 p-4 rounded-lg font-semibold ${
-              mensaje.includes('✓')
-                ? 'bg-green-900 border border-green-700 text-green-300'
-                : 'bg-red-900 border border-red-700 text-red-300'
-            }`}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 p-4 rounded-xl text-sm font-medium border flex items-center justify-center gap-3"
+            style={{ 
+              background: mensaje.includes('✓') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              borderColor: mensaje.includes('✓') ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+              color: mensaje.includes('✓') ? '#4ade80' : '#f87171'
+            }}
           >
             {mensaje}
-          </div>
+          </motion.div>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 
