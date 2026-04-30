@@ -14,9 +14,10 @@ Responsables: Luis Eduardo (CU-09, CU-10)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Optional
+import datetime
 
 from database import get_db
 import models
@@ -37,32 +38,39 @@ router = APIRouter(
 
 class FacturaIndividualCreate(BaseModel):
     """Schema para crear una factura individual."""
-    tipo_servicio: str
-    id_cliente: Optional[int] = None
-    id_venta: Optional[int] = None
-    id_gerente: int  # OBLIGATORIO: Gerente que genera la factura
+    tipo_servicio: str = Field(..., min_length=1)
+    id_cliente: Optional[int] = Field(None, gt=0)
+    id_venta: Optional[int] = Field(None, gt=0)
+    id_gerente: int = Field(..., gt=0)
 
 
 class FacturaEventoCreate(BaseModel):
     """Schema para crear una factura de evento."""
-    id_evento: int
-    id_cliente: Optional[int] = None
-    id_gerente: int  # OBLIGATORIO: Gerente que genera la factura
+    id_evento: int = Field(..., gt=0)
+    id_cliente: Optional[int] = Field(None, gt=0)
+    id_gerente: int = Field(..., gt=0)
 
 
 class FacturaUpdate(BaseModel):
     """Schema para actualizar estado de factura."""
-    estado: str
+    estado: str = Field(..., min_length=1)
 
 
 class ClienteValidateRequest(BaseModel):
     """Schema para validar datos fiscales del cliente."""
-    id_cliente: int
+    id_cliente: int = Field(..., gt=0)
 
 
 class FacturaConfirmarRequest(BaseModel):
     """Schema para confirmar factura (requiere gerente)."""
-    id_gerente: int
+    id_gerente: int = Field(..., gt=0)
+
+class ReporteVentasRequest(BaseModel):
+    id_gerente: int = Field(..., gt=0)
+    id_cine: int = Field(..., gt=0)
+    fechaInicio: datetime.datetime
+    fechaFin: datetime.datetime
+    tipoGrafica: str = Field(..., min_length=1)
 
 
 # ============================================================================
@@ -536,3 +544,66 @@ def reportes_por_estado(db: Session = Depends(get_db)):
         }
     
     return reportes
+
+# ============================================================================
+# CU-10: REPORTES DE VENTAS
+# ============================================================================
+
+@router.post("/reportes/generar-reporte-ventas", response_description="Generar reporte de ventas")
+def generar_reporte_ventas(
+    payload: ReporteVentasRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Generar y consultar reportes de ventas según diagrama CU-10.
+    """
+    if payload.fechaInicio >= payload.fechaFin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio debe ser anterior a la fecha de fin.")
+
+    gerente = db.get(models.Gerente, payload.id_gerente)
+    if not gerente:
+        raise HTTPException(status_code=404, detail="Gerente no encontrado")
+        
+    cine = db.get(models.Cine, payload.id_cine)
+    if not cine:
+        # Para evitar bloquear al usuario, si el cine no existe, lo creamos temporalmente o fallamos.
+        # En un sistema real debería existir. Lo dejamos fallar por integridad.
+        raise HTTPException(status_code=404, detail="Cine no encontrado")
+
+    reporte = models.ReporteVentas(
+        id_cine=payload.id_cine,
+        id_gerente=payload.id_gerente,
+        fechaInicio=payload.fechaInicio,
+        fechaFin=payload.fechaFin,
+        tipoGrafica=payload.tipoGrafica
+    )
+    db.add(reporte)
+    db.commit()
+    db.refresh(reporte)
+    
+    # Gerente visualiza el reporte
+    datos_reporte = gerente.visualizarGraficas(reporte)
+    
+    # Incluimos los datos calculados desde db
+    datos_reporte["datos"] = reporte.generarReporte(db)
+    datos_reporte["ocupacion"] = reporte.calcularOcupacion(db)
+    datos_reporte["rentabilidad"] = reporte.calcularRentabilidad()
+    
+    return {
+        "mensaje": "Reporte generado con éxito",
+        "reporte": datos_reporte
+    }
+
+@router.get("/cliente/{id_cliente}/resumen-compras", response_description="Resumen de compras del cliente")
+def resumen_compras_cliente(
+    id_cliente: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el resumen de compras de un cliente (CU-10).
+    """
+    cliente = db.get(models.Cliente, id_cliente)
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+    return cliente.obtenerResumenCompras()
