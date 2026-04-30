@@ -20,25 +20,29 @@ Antes de empezar a programar, asegúrate de tener instaladas las siguientes herr
 
 Clona este repositorio en tu máquina local:
 ```bash
-git clone [https://github.com/TU_USUARIO/nexo-cinema.git](https://github.com/TU_USUARIO/nexo-cinema.git)```
+git clone [https://github.com/TU_USUARIO/nexo-cinema.git](https://github.com/TU_USUARIO/nexo-cinema.git)
+```
 
 "Levantar el Backend (Python / FastAPI)"
-
+```
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
-
+```
 "Levantar el Frontend (Next.js)"
+```
 cd frontend
-
+```
 Instala las dependencias de Node:
+```
 npm install
 npm run dev
-
+```
 ---
 👨‍💻 Distribución del Trabajo (Arquitectura Modular)
 
 Para evitar conflictos en el código, el sistema se ha  dividido en módulos. Cada integrante es dueño de sus respectivas carpetas y archivos. ¡Por favor, no editen los archivos de sus compañeros!
+
 🎟️ Módulo 1: Gestión de Eventos y Cartelera (El Core)
 
     Encargado: Javier Hernández Flores (CU-01, CU-02)
