@@ -180,12 +180,15 @@ class Evento(Base):
             "tipo_evento": self.tipo_evento
         }
 
+
 class ProyeccionPublica(Evento):
     __tablename__ = "proyecciones_publicas"
     id_proyeccion = Column(Integer, ForeignKey("eventos.id_evento"), primary_key=True)
     pelicula = Column(String(100), nullable=False)
     clasificacion = Column(String(10))
     precio_boleto = Column(Float, nullable=False)
+    # NUEVA COLUMNA: Necesaria para el cálculo del CU-01
+    duracion_minutos = Column(Integer, nullable=False) 
 
     __mapper_args__ = {"polymorphic_identity": "proyeccion_publica"}
 
@@ -783,3 +786,7 @@ class ReporteVentas(Base):
     def calcularRentabilidad(self) -> float:
         # Lógica para calcular rentabilidad
         return 0.0
+
+# ============================================================================
+# MÓDULO DE CARTELERTA  CU-01
+# ============================================================================

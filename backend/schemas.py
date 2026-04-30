@@ -22,6 +22,20 @@ class ProyeccionPublicaResponse(EventoBase):
         from_attributes = True
 
 # ==========================================
+# ESQUEMAS PARA GESTIÓN DE CARTELERA (CU-01)
+# ==========================================
+
+class ProyeccionPublicaCreate(BaseModel):
+    """Esquema para cuando el Supervisor programa una nueva función"""
+    id_sala: int
+    nombre: str # Ej: "Estreno Spiderman"
+    fecha_hora_inicio: datetime
+    pelicula: str
+    clasificacion: Optional[str] = None
+    precio_boleto: float
+    duracion_minutos: int
+
+# ==========================================
 # ESQUEMAS PARA USUARIOS / CLIENTES (Ejemplo para cuando los necesites)
 # ==========================================
 
