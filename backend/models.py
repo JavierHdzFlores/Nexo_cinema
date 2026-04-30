@@ -198,6 +198,11 @@ class EventoPrivado(Evento):
     organizador = Column(String(100))
     motivo = Column(String(200))
     costo_renta = Column(Float, nullable=False)
+    
+    # NUEVOS CAMPOS (CU-02: Servicios Adicionales)
+    req_microfonos = Column(Boolean, default=False)
+    req_catering = Column(Boolean, default=False)
+    req_iluminacion = Column(Boolean, default=False)
 
     __mapper_args__ = {"polymorphic_identity": "evento_privado"}
 
@@ -456,17 +461,6 @@ class ArticuloDulceria(Base):
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, default=10) # Para las alertas de inventario
 
-
-class RegistroLimpieza(Base):
-    __tablename__ = "registros_limpieza"
-
-    id_registro = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
-    fecha_inicio = Column(DateTime, default=datetime.datetime.utcnow)
-    fecha_fin = Column(DateTime, nullable=True)
-    duracion = Column(Float, nullable=True)
-
-    sala = relationship("Sala", backref="registros_limpieza")
 
 class RegistroLimpieza(Base):
     __tablename__ = "registros_limpieza"

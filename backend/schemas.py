@@ -186,3 +186,18 @@ class FuncionTaquillaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ==========================================
+# ESQUEMAS PARA EVENTOS PRIVADOS (CU-02)
+# ==========================================
+class EventoPrivadoCreate(BaseModel):
+    id_sala: int
+    nombre_evento: str
+    fecha_hora_inicio: datetime
+    fecha_hora_fin: datetime
+    organizador: str
+    motivo: str
+    req_microfonos: bool = False
+    req_catering: bool = False
+    req_iluminacion: bool = False
+    costo_base_hora: float = 1000.0  # El precio que le cobren por hora a la sala
