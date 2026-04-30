@@ -52,11 +52,9 @@ class SalaResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 # ==========================================
-# ESQUEMAS PARA SALAS
+# ESQUEMA INVENTARIO 
 # ==========================================
-
 class InventarioEntrada(BaseModel):
     id_insumo: int
     cantidad: int
@@ -66,6 +64,7 @@ class InsumoResponse(BaseModel):
     nombre: str
     stock_actual: int
     stock_minimo: int
+# ==========================================
 # ESQUEMAS PARA AUTENTICACIÓN / LOGIN
 # ==========================================
 
