@@ -59,6 +59,15 @@ class Cliente(Usuario):
             "valido": len(errores) == 0,
             "errores": errores
         }
+    
+    def obtenerResumenCompras(self) -> dict:
+        total = sum(venta.total for venta in self.ventas)
+        return {
+            "id_cliente": self.id_cliente,
+            "nombre": self.nombre,
+            "total_comprado": total,
+            "cantidad_compras": len(self.ventas)
+        }
 
 class Empleado(Usuario):
     __tablename__ = "empleados"
@@ -76,8 +85,18 @@ class Gerente(Empleado):
     
     # NUEVO: Efecto espejo hacia Factura
     facturas_generadas = relationship("Factura", back_populates="gerente")
+    reportes_generados = relationship("ReporteVentas", back_populates="gerente")
 
     __mapper_args__ = {"polymorphic_identity": "gerente"}
+    
+    def consultarReportes(self) -> list:
+        return self.reportes_generados
+
+    def visualizarGraficas(self, reporte: "ReporteVentas") -> dict:
+        return {
+            "tipo": reporte.tipoGrafica,
+            "datos": reporte.generarReporte()
+        }
     
     def generarFactura(self, tipo_factura: str, datos: dict, db=None):
         if tipo_factura == 'individual':
@@ -647,3 +666,61 @@ class LogAuditoria(Base):
     def escribirEntrada(self, db, detalle_txt: str) -> None:
         self.detalle = detalle_txt
         db.add(self)
+
+# ============================================================================
+# CU-10: CONSULTAR REPORTES DE VENTAS
+# ============================================================================
+
+class Cine(Base):
+    __tablename__ = "cines"
+    idCine = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    nombre = Column(String(100), nullable=False)
+    direccion = Column(String(200), nullable=False)
+
+    reportes = relationship("ReporteVentas", back_populates="cine")
+
+    def obtenerHistorialVentas(self, db) -> list:
+        return db.query(Venta).all()
+    
+    def actualizarReporte(self, reporte: "ReporteVentas"):
+        pass
+
+class ReporteVentas(Base):
+    __tablename__ = "reportes_ventas"
+    idReporte = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_cine = Column(Integer, ForeignKey("cines.idCine"))
+    id_gerente = Column(Integer, ForeignKey("gerentes.id_gerente"))
+    fechaInicio = Column(DateTime, nullable=False)
+    fechaFin = Column(DateTime, nullable=False)
+    tipoGrafica = Column(String(50))
+
+    cine = relationship("Cine", back_populates="reportes")
+    gerente = relationship("Gerente", back_populates="reportes_generados")
+
+    def generarReporte(self, db=None) -> dict:
+        if db is None:
+            return {}
+        
+        ventas = db.query(Venta).filter(
+            Venta.fecha_venta >= self.fechaInicio,
+            Venta.fecha_venta <= self.fechaFin
+        ).all()
+        
+        total = sum(v.total for v in ventas)
+        
+        return {
+            "idReporte": self.idReporte,
+            "fechaInicio": self.fechaInicio,
+            "fechaFin": self.fechaFin,
+            "tipoGrafica": self.tipoGrafica,
+            "cantidadVentas": len(ventas),
+            "totalVentas": total
+        }
+
+    def calcularOcupacion(self, db) -> float:
+        # Lógica para calcular ocupación basada en los boletos y funciones
+        return 0.0
+
+    def calcularRentabilidad(self) -> float:
+        # Lógica para calcular rentabilidad
+        return 0.0
