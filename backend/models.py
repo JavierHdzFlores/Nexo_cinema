@@ -767,3 +767,31 @@ class Cotizacion(Base):
 
     # Relación para poder acceder a los datos de la sala
     sala = relationship("Sala")
+
+    # ── Diagrama 1 (Clases): +validar_vigencia() ──
+    def validar_vigencia(self) -> bool:
+        """
+        Verifica si la cotización sigue vigente.
+        Si ya expiró, transiciona el estado a 'Vencida' (Diagrama 6: vigencia_expirada).
+        Retorna True si la cotización aún es válida.
+        """
+        if datetime.datetime.utcnow() > self.fecha_vigencia:
+            self.estado = "Vencida"
+            return False
+        return True
+
+    # ── Diagrama 5 (Clases detallado): +crear_registro_db() : void ──
+    def crear_registro_db(self, db) -> None:
+        """Persiste la entidad de cotización en la base de datos."""
+        db.add(self)
+        db.commit()
+        db.refresh(self)
+
+    # ── Diagrama 6 (Máquina de Estados): Transiciones desde 'Pendiente' ──
+    def pago_confirmado(self) -> None:
+        """Transición: Pendiente → Pagada"""
+        self.estado = "Pagada"
+
+    def vigencia_expirada(self) -> None:
+        """Transición: Pendiente → Vencida"""
+        self.estado = "Vencida"

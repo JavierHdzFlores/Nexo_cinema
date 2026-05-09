@@ -99,47 +99,90 @@ def registrar_venta_taquilla(datos_venta: schemas.VentaTaquillaRequest, db: Sess
 # ==========================================
 # CU-03: COTIZAR PAQUETES CORPORATIVOS
 # ==========================================
+# Diagrama 7 (Paquetes):  <<Controlador>> TaquillaRouter
+#   usa_para_validar   → <<Validación>>       Pydantic_Schemas  (CotizacionCreate)
+#   persiste_datos     → <<Persistencia>>     SQLAlchemy_Models  (Cotizacion)
+#   requiere_sesion    → <<Infraestructura>>  Database_Session   (get_db)
+
+from procesador_costos import ProcesadorCostos
+
+
+# ── Diagrama 5: -verificar_disponibilidad(id_sala, inicio, fin) : List<Sala> ──
+def _verificar_disponibilidad(id_sala: int, inicio: datetime, fin: datetime, db: Session) -> list:
+    """
+    Método privado del controlador.
+    Diagrama 2 (Secuencia): filter(Evento.id_sala == id_sala) → Validación de disponibilidad.
+    Diagrama 6 (Estados): Sub-estado 'Validando' dentro de 'Pendiente'.
+    
+    Retorna None si la sala está libre, o la lista de salas sugeridas si hay empalme.
+    """
+    empalme = db.query(Evento).filter(
+        Evento.id_sala == id_sala,
+        Evento.fecha_hora_inicio < fin,
+        Evento.fecha_hora_fin > inicio
+    ).first()
+
+    if not empalme:
+        return None  # Sala disponible
+
+    # Diagrama 2 (Secuencia): query(Sala).notin_(ocupadas) → Sugerencias[]
+    salas_ocupadas = db.query(Evento.id_sala).filter(
+        Evento.fecha_hora_inicio < fin,
+        Evento.fecha_hora_fin > inicio
+    ).subquery()
+
+    salas_disponibles = db.query(Sala).filter(Sala.id_sala.notin_(salas_ocupadas)).all()
+    return [{"id_sala": s.id_sala, "nombre": s.nombre} for s in salas_disponibles]
+
+
+# ── Diagrama 5: -notificar_error_empalme(sugerencias) : HTTPException ──
+def _notificar_error_empalme(sugerencias: list):
+    """
+    Método privado del controlador.
+    Diagrama 2 (Secuencia): 400 Bad Request + sugerencias → Taquillero.
+    Diagrama 6 (Estados): Transición → 'Error' (sala_ocupada).
+    """
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={
+            "mensaje": "La sala no está disponible en el horario solicitado.",
+            "salas_sugeridas": sugerencias
+        }
+    )
+
+
+# ── Diagrama 5: +generar_cotizacion(data: CotizacionCreate, db: Session) : dict ──
 @router.post("/cotizacion", status_code=status.HTTP_201_CREATED)
 def generar_cotizacion(cotizacion: schemas.CotizacionCreate, db: Session = Depends(get_db)):
     """
     Genera un presupuesto digital sin reservar/bloquear la sala.
-    """
-    empalmes = db.query(Evento).filter(
-        Evento.id_sala == cotizacion.id_sala,
-        Evento.fecha_hora_inicio < cotizacion.fecha_hora_fin,
-        Evento.fecha_hora_fin > cotizacion.fecha_hora_inicio
-    ).first()
-
-    if empalmes:
-        salas_ocupadas = db.query(Evento.id_sala).filter(
-            Evento.fecha_hora_inicio < cotizacion.fecha_hora_fin,
-            Evento.fecha_hora_fin > cotizacion.fecha_hora_inicio
-        ).subquery()
-
-        salas_disponibles = db.query(Sala).filter(Sala.id_sala.notin_(salas_ocupadas)).all()
-        sugerencias = [{"id_sala": s.id_sala, "nombre": s.nombre} for s in salas_disponibles]
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "mensaje": "La sala no está disponible en el horario solicitado.",
-                "salas_sugeridas": sugerencias
-            }
-        )
-
-    diferencia_horas = (cotizacion.fecha_hora_fin - cotizacion.fecha_hora_inicio).total_seconds() / 3600
-    costo_sala = diferencia_horas * cotizacion.costo_base_hora
-
-    precio_por_persona = 0
-    if cotizacion.paquete_dulceria.lower() == "basico":
-        precio_por_persona = 150.0
-    elif cotizacion.paquete_dulceria.lower() == "premium":
-        precio_por_persona = 250.0
-    elif cotizacion.paquete_dulceria.lower() == "vip":
-        precio_por_persona = 400.0
     
-    costo_dulceria = precio_por_persona * cotizacion.asistentes
-    total_cotizacion = costo_sala + costo_dulceria
+    Diagrama 2 (Secuencia):  POST /cotizacion (JSON) → TaquillaRouter
+    Diagrama 4 (Colaboración): 1: generar_cotizacion(data)
+    Diagrama 6 (Estados):  post_cotizacion → Pendiente[Validando → Calculando → Generada]
+    """
+
+    # ─── FASE 1: Validando (Diagrama 6, sub-estado) ───
+    sugerencias = _verificar_disponibilidad(
+        cotizacion.id_sala, cotizacion.fecha_hora_inicio, cotizacion.fecha_hora_fin, db
+    )
+    if sugerencias is not None:
+        _notificar_error_empalme(sugerencias)
+
+    # ─── FASE 2: Calculando (Diagrama 6, sub-estado) ───
+    # Diagrama 4: 3: total_seconds() / 3600 → Calculo_Horas
+    horas = ProcesadorCostos.obtener_diferencia_horas(
+        cotizacion.fecha_hora_inicio, cotizacion.fecha_hora_fin
+    )
+    costo_sala = ProcesadorCostos.calcular_costo_sala(horas, cotizacion.costo_base_hora)
+
+    # Diagrama 4: 4: if(paquete == VIP) → Calculo_Dulceria
+    tarifa_dulceria = ProcesadorCostos.determinar_tarifa_dulceria(cotizacion.paquete_dulceria)
+    costo_dulceria = tarifa_dulceria * cotizacion.asistentes
+    total = ProcesadorCostos.totalizar(costo_sala, tarifa_dulceria, cotizacion.asistentes)
+
+    # ─── FASE 3: Generada (Diagrama 6, sub-estado) ───
+    # Diagrama 5: ProcesadorCostos → "2. Setea Totales" → CotizacionModel
     vigencia = datetime.utcnow() + timedelta(days=15)
 
     nueva_cotizacion = Cotizacion(
@@ -151,14 +194,16 @@ def generar_cotizacion(cotizacion: schemas.CotizacionCreate, db: Session = Depen
         paquete_dulceria=cotizacion.paquete_dulceria,
         costo_sala=costo_sala,
         costo_dulceria=costo_dulceria,
-        total=total_cotizacion,
+        total=total,
         fecha_vigencia=vigencia
     )
 
-    db.add(nueva_cotizacion)
-    db.commit()
-    db.refresh(nueva_cotizacion)
+    # Diagrama 4: 5: db.add(nueva_cotizacion) → MySQL
+    # Diagrama 5: TaquillaRouter → "3. Persiste" → CotizacionModel
+    nueva_cotizacion.crear_registro_db(db)
 
+    # Diagrama 2 (Secuencia): 201 Created (Desglose Total) → Taquillero
+    # Diagrama 4: 6: return JSON_Response
     return {
         "mensaje": "Cotización generada exitosamente",
         "id_cotizacion": nueva_cotizacion.id_cotizacion,
@@ -166,6 +211,6 @@ def generar_cotizacion(cotizacion: schemas.CotizacionCreate, db: Session = Depen
         "desglose": {
             "costo_sala": costo_sala,
             "costo_dulceria": costo_dulceria,
-            "gran_total": total_cotizacion
+            "gran_total": total
         }
     }
