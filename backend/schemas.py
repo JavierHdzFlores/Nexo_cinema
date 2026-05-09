@@ -162,10 +162,16 @@ class VentaDulceriaResponse(BaseModel):
 # ==========================================
 # ESQUEMAS PARA TAQUILLA (CU-04)
 # ==========================================
+class BloqueoAsientosRequest(BaseModel):
+    id_evento: int
+    ids_asientos: list[int]
+    id_cliente_temp: str  # Un UUID o string generado en el frontend para rastrear quién bloqueó
+
 class VentaTaquillaRequest(BaseModel):
     id_evento: int
     ids_asientos: list[int]
     metodo_pago: str
+    id_cliente_temp: str  # Debe coincidir con el que bloqueó
     id_taquillero: Optional[int] = None
     id_cliente: Optional[int] = None
 

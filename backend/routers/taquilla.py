@@ -12,42 +12,141 @@ router = APIRouter(
     tags=["Taquilla y Cotizaciones"]
 )
 
+from procesador_venta import ValidadorTransaccion, ProcesadorVenta
+from models import BloqueoAsiento
 # ==========================================
-# CU-04: VENDER BOLETOS EN TAQUILLA
+# CU-04: ENDPOINTS DE CONSULTA (Frontend)
 # ==========================================
-@router.post("/vender", response_model=schemas.VentaTaquillaResponse, status_code=status.HTTP_201_CREATED)
-def registrar_venta_taquilla(datos_venta: schemas.VentaTaquillaRequest, db: Session = Depends(get_db)):
-    # 1. Verificar que el evento exista y sea una Proyección Pública
-    evento = db.query(Evento).filter(Evento.id_evento == datos_venta.id_evento).first()
+
+@router.get("/funciones")
+def listar_funciones(db: Session = Depends(get_db)):
+    """Paso 1: El Taquillero selecciona la función deseada."""
+    funciones = db.query(ProyeccionPublica).all()
+    return [
+        {
+            "id": f.id_evento,
+            "pelicula": f.pelicula,
+            "clasificacion": f.clasificacion,
+            "fecha_hora_inicio": f.fecha_hora_inicio,
+            "precio_boleto": f.precio_boleto,
+            "id_sala": f.id_sala,
+            "sala_nombre": f.sala.nombre if f.sala else "Sin sala",
+            "imagen_url": f.imagen_url
+        }
+        for f in funciones
+    ]
+
+@router.get("/eventos/{id_evento}/asientos")
+def obtener_mapa_asientos(id_evento: int, db: Session = Depends(get_db)):
+    """
+    Paso 2: El sistema muestra el mapa de asientos con estado actual.
+    Evalúa en tiempo real: disponible, ocupado o bloqueado.
+    Implementa Excepción E2 (lazy): limpia bloqueos expirados antes de responder.
+    """
+    evento = db.query(Evento).filter(Evento.id_evento == id_evento).first()
     if not evento:
-        raise HTTPException(status_code=404, detail="El evento no existe.")
-        
-    if not isinstance(evento, ProyeccionPublica):
-        raise HTTPException(status_code=400, detail="No se pueden vender boletos individuales para eventos privados.")
+        raise HTTPException(status_code=404, detail="Evento no encontrado.")
 
-    # 2. Verificar que los asientos existan y pertenezcan a la sala del evento
-    asientos = db.query(Asiento).filter(Asiento.id_asiento.in_(datos_venta.ids_asientos)).all()
-    if len(asientos) != len(datos_venta.ids_asientos):
-        raise HTTPException(status_code=404, detail="Uno o más asientos no existen en el sistema.")
-        
-    for asiento in asientos:
-        if asiento.id_sala != evento.id_sala:
-            raise HTTPException(status_code=400, detail=f"El asiento {asiento.numero} no pertenece a la sala de esta función.")
+    # Limpiar bloqueos expirados (E2)
+    ValidadorTransaccion.limpiar_bloqueos_expirados(db)
 
-    # 3. Validar Disponibilidad (Excepción E1: Asiento seleccionado por otro usuario)
-    boletos_vendidos = db.query(Boleto).filter(
-        Boleto.id_evento == evento.id_evento,
-        Boleto.id_asiento.in_(datos_venta.ids_asientos)
-    ).all()
+    asientos = db.query(Asiento).filter(Asiento.id_sala == evento.id_sala).order_by(Asiento.numero).all()
     
-    if boletos_vendidos:
+    # Boletos ya vendidos para este evento
+    boletos = db.query(Boleto.id_asiento).filter(Boleto.id_evento == id_evento).all()
+    ids_vendidos = {b.id_asiento for b in boletos}
+    
+    # Bloqueos activos para este evento
+    bloqueos = db.query(BloqueoAsiento).filter(
+        BloqueoAsiento.id_evento == id_evento,
+        BloqueoAsiento.fecha_expiracion > datetime.utcnow()
+    ).all()
+    bloqueos_map = {b.id_asiento: b.id_cliente_temp for b in bloqueos}
+
+    mapa = []
+    for asiento in asientos:
+        if asiento.id_asiento in ids_vendidos:
+            estado = "ocupado"
+        elif asiento.id_asiento in bloqueos_map:
+            estado = "bloqueado"
+        else:
+            estado = "disponible"
+        
+        mapa.append({
+            "id_asiento": asiento.id_asiento,
+            "numero": asiento.numero,
+            "estado": estado,
+            "bloqueado_por": bloqueos_map.get(asiento.id_asiento)
+        })
+
+    return {"id_evento": id_evento, "id_sala": evento.id_sala, "asientos": mapa}
+
+
+# CU-04: VENDER BOLETOS EN TAQUILLA (Y BLOQUEOS)
+# ==========================================
+
+@router.post("/bloquear", status_code=status.HTTP_200_OK)
+def bloquear_asientos_temporal(datos: schemas.BloqueoAsientosRequest, db: Session = Depends(get_db)):
+    """
+    PASO 4: El sistema bloquea temporalmente los asientos.
+    """
+    evento = db.query(Evento).filter(Evento.id_evento == datos.id_evento).first()
+    if not ValidadorTransaccion.verificar_tipo_evento(evento):
+        raise HTTPException(status_code=400, detail="Evento inválido para venta de boletos.")
+
+    ValidadorTransaccion.validar_integridad_asientos(db, datos.ids_asientos, evento.id_sala)
+
+    # Excepción E1: Asiento seleccionado por otro usuario
+    if not ValidadorTransaccion.checar_disponibilidad_real(db, datos.ids_asientos, datos.id_evento, datos.id_cliente_temp):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, 
-            detail="Uno o más asientos ya no están disponibles."
+            detail="Excepción E1: Uno o más asientos ya no están disponibles."
         )
 
-    # 4. Cálculo del total y creación de la transacción
-    total_venta = len(asientos) * evento.precio_boleto
+    # Crear los bloqueos temporales por 5 minutos
+    expiracion = datetime.utcnow() + timedelta(minutes=5)
+    for id_asiento in datos.ids_asientos:
+        # Usar UPSERT logic o eliminar bloqueos expirados primero
+        db.query(BloqueoAsiento).filter(
+            BloqueoAsiento.id_evento == datos.id_evento,
+            BloqueoAsiento.id_asiento == id_asiento
+        ).delete()
+        
+        nuevo_bloqueo = BloqueoAsiento(
+            id_evento=datos.id_evento,
+            id_asiento=id_asiento,
+            fecha_expiracion=expiracion,
+            id_cliente_temp=datos.id_cliente_temp
+        )
+        db.add(nuevo_bloqueo)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Error de concurrencia al bloquear.")
+
+    return {"mensaje": "Asientos bloqueados exitosamente por 5 minutos.", "expira_en_minutos": 5}
+
+
+@router.post("/vender", response_model=schemas.VentaTaquillaResponse, status_code=status.HTTP_201_CREATED)
+def registrar_venta_taquilla(datos_venta: schemas.VentaTaquillaRequest, db: Session = Depends(get_db)):
+    # 1. Validaciones base (Diagrama 4)
+    evento = db.query(Evento).filter(Evento.id_evento == datos_venta.id_evento).first()
+    if not ValidadorTransaccion.verificar_tipo_evento(evento):
+        raise HTTPException(status_code=400, detail="Evento inválido para venta de boletos.")
+
+    asientos = ValidadorTransaccion.validar_integridad_asientos(db, datos_venta.ids_asientos, evento.id_sala)
+
+    # 2. Validar Disponibilidad final
+    if not ValidadorTransaccion.checar_disponibilidad_real(db, datos_venta.ids_asientos, datos_venta.id_evento, datos_venta.id_cliente_temp):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail="Excepción E1: Uno o más asientos ya no están disponibles."
+        )
+
+    # 3. Cálculo del total y creación de la transacción
+    total_venta = ProcesadorVenta.calcular_total(len(asientos), evento.precio_boleto)
     
     nueva_venta = Venta(
         id_empleado=datos_venta.id_taquillero,
@@ -60,20 +159,16 @@ def registrar_venta_taquilla(datos_venta: schemas.VentaTaquillaRequest, db: Sess
     )
     
     try:
-        db.add(nueva_venta)
-        db.flush() # Empuja la venta para obtener el id_venta
+        # 4. Flush para obtener ID (Diagrama 4)
+        nueva_venta.flush_para_id(db)
 
-        # 5. Generar boletos y "Bloquear/Ocupar" permanentemente los asientos
-        for asiento in asientos:
-            nuevo_boleto = Boleto(
-                id_venta=nueva_venta.id_venta,
-                id_evento=evento.id_evento,
-                id_asiento=asiento.id_asiento,
-                precio_final=evento.precio_boleto
-            )
-            db.add(nuevo_boleto)
+        # 5. Generar boletos
+        ProcesadorVenta.generar_boletos_lote(db, nueva_venta.id_venta, evento.id_evento, asientos, evento.precio_boleto)
+        
+        # 6. Limpiar bloqueos que poseía este cliente para esta venta
+        ProcesadorVenta.limpiar_bloqueos_propios(db, evento.id_evento, datos_venta.ids_asientos, datos_venta.id_cliente_temp)
 
-        db.commit() # Si otro hilo intenta vender el mismo asiento, chocará aquí gracias al UniqueConstraint
+        db.commit() # Si otro hilo intenta vender el mismo asiento sin bloqueo, chocará aquí.
         db.refresh(nueva_venta)
         
         return {
@@ -84,13 +179,9 @@ def registrar_venta_taquilla(datos_venta: schemas.VentaTaquillaRequest, db: Sess
             "boletos_generados": len(asientos)
         }
 
-    except IntegrityError:
-        # Excepción crítica de concurrencia: Alguien nos ganó el asiento en milisegundos
+    except IntegrityError as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, 
-            detail="Excepción de concurrencia: Uno o más asientos ya no están disponibles."
-        )
+        raise ProcesadorVenta.manejar_error_concurrencia(e)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error en la transacción: {str(e)}")

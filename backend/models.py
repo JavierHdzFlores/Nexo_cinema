@@ -189,6 +189,7 @@ class ProyeccionPublica(Evento):
     precio_boleto = Column(Float, nullable=False)
     # NUEVA COLUMNA: Necesaria para el cálculo del CU-01
     duracion_minutos = Column(Integer, nullable=False) 
+    imagen_url = Column(String(255), nullable=True) # Soporte para imágenes de carteleras
 
     __mapper_args__ = {"polymorphic_identity": "proyeccion_publica"}
 
@@ -226,6 +227,12 @@ class Venta(Base):
     factura_individual = relationship("FacturaIndividual", uselist=False, back_populates="venta")   
     boletos = relationship("Boleto", back_populates="venta") # NUEVO
 
+    # ── Diagrama 4 (Clases Detallado): +flush_para_id() ──
+    def flush_para_id(self, db) -> None:
+        """Sincroniza la venta con BD para obtener el ID antes del commit final"""
+        db.add(self)
+        db.flush()
+
 # ==========================================
 # NUEVAS TABLAS: ASIENTO Y BOLETO (CU-04)
 # ==========================================
@@ -252,6 +259,26 @@ class Boleto(Base):
     # REGLA DE NEGOCIO: Evitar duplicidad de asientos en tiempo real
     __table_args__ = (
         UniqueConstraint('id_evento', 'id_asiento', name='uix_evento_asiento'),
+    )
+
+class BloqueoAsiento(Base):
+    """
+    Entidad adicional requerida por Regla de Negocio 1 y 2.
+    Maneja el bloqueo temporal durante la selección concurrente (Excepciones E1 y E2).
+    """
+    __tablename__ = "bloqueos_asientos"
+    id_bloqueo = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=False)
+    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"), nullable=False)
+    fecha_expiracion = Column(DateTime, nullable=False)
+    # Identificador de sesión o cliente para saber quién lo bloqueó
+    id_cliente_temp = Column(String(100), nullable=False) 
+
+    evento = relationship("Evento")
+    asiento = relationship("Asiento")
+
+    __table_args__ = (
+        UniqueConstraint('id_evento', 'id_asiento', name='uix_bloqueo_evento_asiento'),
     )
 
 # ============================================================================
@@ -497,7 +524,7 @@ class Combo(ArticuloDulceria):
     def obtenerProductos(self) -> list:
         return self.productos_combo
 
-class Insumo(Base):
+class InsumoDulceria(Base):
     __tablename__ = "insumos_dulceria"
     id_insumo = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
@@ -522,7 +549,7 @@ class RecetaInsumo(Base):
     cantidad_requerida = Column(Float, nullable=False)
     
     producto = relationship("ProductoIndividual", back_populates="receta")
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
 
 class ComboProducto(Base):
     """Asociación Muchos a Muchos entre Combo y ProductoIndividual"""
@@ -571,7 +598,7 @@ class LogMovimiento(Base):
     accion = Column(String(200), nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
     
     def guardarRegistro(self, db):
         db.add(self)
