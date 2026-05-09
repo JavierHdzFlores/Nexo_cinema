@@ -417,6 +417,15 @@ class ArticuloDulceria(Base):
     precio = Column(Float, nullable=False)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, default=10) # Para las alertas de inventario
+    tipo_articulo = Column(String(50)) # Discriminador para herencia
+
+    __mapper_args__ = {
+        "polymorphic_identity": "articulo",
+        "polymorphic_on": tipo_articulo,
+    }
+    
+    def obtenerPrecio(self) -> float:
+        return self.precio
 
 
 class RegistroLimpieza(Base):
@@ -463,15 +472,7 @@ class AlertaStock(Base):
     activa = Column(Boolean, default=True)
 
     insumo = relationship("Insumo", backref="alertas")
-    tipo_articulo = Column(String(50)) # Discriminador para herencia
 
-    __mapper_args__ = {
-        "polymorphic_identity": "articulo",
-        "polymorphic_on": tipo_articulo,
-    }
-    
-    def obtenerPrecio(self) -> float:
-        return self.precio
 
 class ProductoIndividual(ArticuloDulceria):
     __tablename__ = "productos_individuales"
@@ -497,7 +498,7 @@ class Combo(ArticuloDulceria):
     def obtenerProductos(self) -> list:
         return self.productos_combo
 
-class Insumo(Base):
+class InsumoDulceria(Base):
     __tablename__ = "insumos_dulceria"
     id_insumo = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
@@ -522,7 +523,7 @@ class RecetaInsumo(Base):
     cantidad_requerida = Column(Float, nullable=False)
     
     producto = relationship("ProductoIndividual", back_populates="receta")
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
 
 class ComboProducto(Base):
     """Asociación Muchos a Muchos entre Combo y ProductoIndividual"""
@@ -571,7 +572,7 @@ class LogMovimiento(Base):
     accion = Column(String(200), nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
     
     def guardarRegistro(self, db):
         db.add(self)

@@ -19,6 +19,16 @@ def obtener_catalogo_productos(db: Session = Depends(get_db)):
     productos = db.query(models.ArticuloDulceria).all()
     return productos
 
+@router.get("/seed")
+def seed_base_datos(db: Session = Depends(get_db)):
+    """Ruta temporal para inicializar la base de datos de dulcería"""
+    from seed_dulceria import seed_dulceria
+    try:
+        seed_dulceria()
+        return {"mensaje": "Base de datos inicializada correctamente con productos y combos."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ============================================================================
 # GESTOR MONEDERO (Clase controladora para CU-06)
@@ -160,127 +170,126 @@ def vender_dulceria(venta_req: schemas.VentaDulceriaRequest, db: Session = Depen
     """
     gestor = GestorMonedero(db)
 
-    # ── 1. Iniciar Venta ──
-    nueva_venta = models.Venta(total=0.0)
-    nueva_venta.iniciarVenta() # Estado: "Iniciada"
-    if venta_req.id_cliente:
-        nueva_venta.id_cliente = venta_req.id_cliente
-    db.add(nueva_venta)
-    db.commit()
-    db.refresh(nueva_venta)
+    try:
+        # ── 1. Iniciar Venta ──
+        nueva_venta = models.Venta(total=0.0)
+        nueva_venta.iniciarVenta() # Estado: "Iniciada"
+        if venta_req.id_cliente:
+            nueva_venta.id_cliente = venta_req.id_cliente
+        db.add(nueva_venta)
+        db.flush() # ATOMICIDAD: Flush en lugar de commit para no cerrar la transacción
 
-    detalles_venta = []
+        detalles_venta = []
 
-    # ── 2. Carga de productos y descuento de inventario ──
-    for item in venta_req.detalles:
-        articulo = db.query(models.ArticuloDulceria).filter(
-            models.ArticuloDulceria.id_articulo == item.id_articulo
-        ).first()
-        if not articulo:
-            db.rollback()
-            raise HTTPException(status_code=404, detail=f"Artículo {item.id_articulo} no encontrado")
+        # ── 2. Carga de productos y descuento de inventario ──
+        for item in venta_req.detalles:
+            articulo = db.query(models.ArticuloDulceria).filter(
+                models.ArticuloDulceria.id_articulo == item.id_articulo
+            ).first()
+            if not articulo:
+                raise HTTPException(status_code=404, detail=f"Artículo {item.id_articulo} no encontrado")
 
-        # Diagrama 7: agregarDetalle(articulo, cant) -> calcularSubtotal()
-        detalle = nueva_venta.agregarDetalle(articulo, item.cantidad)
-        detalles_venta.append(detalle)
-        db.add(detalle)
+            # Diagrama 7: agregarDetalle(articulo, cant) -> calcularSubtotal()
+            detalle = nueva_venta.agregarDetalle(articulo, item.cantidad)
+            detalles_venta.append(detalle)
+            db.add(detalle)
 
-        if isinstance(articulo, models.ProductoIndividual):
-            for receta in articulo.receta:
-                insumo = receta.insumo
-                cant_necesaria = receta.cantidad_requerida * item.cantidad
-                try:
-                    insumo.descontarStock(cant_necesaria)
-                    log_mov = models.LogMovimiento(
-                        id_insumo=insumo.id_insumo,
-                        accion=f"Venta #{nueva_venta.id_venta} - {articulo.nombre}"
-                    )
-                    log_mov.guardarRegistro(db)
-                except ValueError as e:
-                    db.rollback()
-                    raise HTTPException(status_code=400, detail=str(e))
-
-        elif isinstance(articulo, models.Combo):
-            for combo_prod in articulo.productos_combo:
-                prod_ind = combo_prod.producto
-                cant_prod_total = combo_prod.cantidad * item.cantidad
-                for receta in prod_ind.receta:
+            if isinstance(articulo, models.ProductoIndividual):
+                for receta in articulo.receta:
                     insumo = receta.insumo
-                    cant_necesaria = receta.cantidad_requerida * cant_prod_total
+                    cant_necesaria = receta.cantidad_requerida * item.cantidad
                     try:
                         insumo.descontarStock(cant_necesaria)
                         log_mov = models.LogMovimiento(
                             id_insumo=insumo.id_insumo,
-                            accion=f"Venta #{nueva_venta.id_venta} - Combo: {articulo.nombre}"
+                            accion=f"Venta #{nueva_venta.id_venta} - {articulo.nombre}"
                         )
-                        log_mov.guardarRegistro(db)
+                        db.add(log_mov) # Se omite guardarRegistro para mantener la transacción abierta
                     except ValueError as e:
-                        db.rollback()
                         raise HTTPException(status_code=400, detail=str(e))
 
-    # Diagrama 7: calcularTotal()
-    total_calculado = nueva_venta.calcularTotal(detalles_venta)
-    db.commit() # Asegurar id_venta
+            elif isinstance(articulo, models.Combo):
+                for combo_prod in articulo.productos_combo:
+                    prod_ind = combo_prod.producto
+                    cant_prod_total = combo_prod.cantidad * item.cantidad
+                    for receta in prod_ind.receta:
+                        insumo = receta.insumo
+                        cant_necesaria = receta.cantidad_requerida * cant_prod_total
+                        try:
+                            insumo.descontarStock(cant_necesaria)
+                            log_mov = models.LogMovimiento(
+                                id_insumo=insumo.id_insumo,
+                                accion=f"Venta #{nueva_venta.id_venta} - Combo: {articulo.nombre}"
+                            )
+                            db.add(log_mov)
+                        except ValueError as e:
+                            raise HTTPException(status_code=400, detail=str(e))
 
-    # ── Generación temprana del Ticket para inyectar detalles de puntos (Diagrama 6 CU-06) ──
-    import uuid
-    ticket = models.Ticket(
-        id_venta=nueva_venta.id_venta,
-        folio_fiscal=f"TICK-{uuid.uuid4().hex[:8].upper()}"
-    )
-    db.add(ticket)
+        # Diagrama 7: calcularTotal()
+        total_calculado = nueva_venta.calcularTotal(detalles_venta)
+        db.flush()
 
-    # ── 3. Procesamiento del Monedero (CU-06) ──
-    comprobante_monedero: schemas.MovimientoMonederoResponse | None = None
+        # ── Generación temprana del Ticket ──
+        import uuid
+        ticket = models.Ticket(
+            id_venta=nueva_venta.id_venta,
+            folio_fiscal=f"TICK-{uuid.uuid4().hex[:8].upper()}"
+        )
+        db.add(ticket)
+        db.flush()
 
-    if venta_req.id_cliente:
-        try:
-            monedero = gestor.validarCuenta(venta_req.id_cliente)
+        # ── 3. Procesamiento del Monedero (CU-06) ──
+        comprobante_monedero: schemas.MovimientoMonederoResponse | None = None
 
-            if venta_req.usar_puntos and venta_req.puntos_a_usar and venta_req.puntos_a_usar > 0:
-                # Flujo S1: Canjear puntos
-                puntos_canjeados = gestor.procesarCanje(monedero, venta_req.puntos_a_usar, ticket)
-                descuento = float(min(puntos_canjeados, int(total_calculado)))
-                nueva_venta.total = max(0.0, total_calculado - descuento)
-                comprobante_monedero = gestor.generarComprobanteMonedero(monedero, "Canje", puntos_canjeados)
-            else:
-                # Flujo S2: Acumular (5% sobre el monto pagado en efectivo)
-                puntos_acumulados = gestor.aplicarReglaPuntos(monedero, nueva_venta.total, ticket)
-                comprobante_monedero = gestor.generarComprobanteMonedero(monedero, "Acumulacion", puntos_acumulados)
+        if venta_req.id_cliente:
+            try:
+                monedero = gestor.validarCuenta(venta_req.id_cliente)
 
-        except LookupError as e:
-            # E2 CU-06: Cuenta bloqueada o inexistente — no interrumpimos la venta,
-            # solo no aplicamos monedero (comportamiento apropiado para POS)
-            pass
-        except ValueError as e:
-            db.rollback()
-            raise HTTPException(status_code=400, detail=str(e))  # E1: Saldo insuficiente
+                if venta_req.usar_puntos and venta_req.puntos_a_usar and venta_req.puntos_a_usar > 0:
+                    puntos_canjeados = gestor.procesarCanje(monedero, venta_req.puntos_a_usar, ticket)
+                    descuento = float(min(puntos_canjeados, int(total_calculado)))
+                    nueva_venta.total = max(0.0, total_calculado - descuento)
+                    comprobante_monedero = gestor.generarComprobanteMonedero(monedero, "Canje", puntos_canjeados)
+                else:
+                    puntos_acumulados = gestor.aplicarReglaPuntos(monedero, nueva_venta.total, ticket)
+                    comprobante_monedero = gestor.generarComprobanteMonedero(monedero, "Acumulacion", puntos_acumulados)
 
-    # ── 4. Procesar Pago (autorizarPago) ──
-    nueva_venta.procesarPago() # Estado: "PendienteDePago"
-    nuevo_pago = models.Pago(id_venta=nueva_venta.id_venta, monto=nueva_venta.total)
-    if not nuevo_pago.autorizarPago():
+            except LookupError as e:
+                pass
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+        # ── 4. Procesar Pago (autorizarPago) ──
+        nueva_venta.procesarPago() # Estado: "PendienteDePago"
+        nuevo_pago = models.Pago(id_venta=nueva_venta.id_venta, monto=nueva_venta.total)
+        if not nuevo_pago.autorizarPago():
+            raise HTTPException(status_code=400, detail="Pago rechazado por el sistema")
+        db.add(nuevo_pago)
+
+        # ── 5. Registrar Venta (Estado final y Ticket) ──
+        nueva_venta.registrarVenta() # Estado: "Finalizada"
+        
+        # ── 6. COMMIT ATÓMICO FINAL ──
+        # Persiste el inventario, los puntos y el ticket en el mismo milisegundo
+        db.commit()
+        db.refresh(ticket)
+        
+        ticket.generarPDF()
+        ticket.imprimir()
+
+        return schemas.VentaDulceriaResponse(
+            id_venta=nueva_venta.id_venta,
+            total=nueva_venta.total,
+            estado=nueva_venta.estado,
+            mensaje="Venta registrada exitosamente.",
+            monedero=comprobante_monedero
+        )
+
+    except HTTPException as http_exc:
+        # Capturamos excepciones controladas y hacemos ROLLBACK seguro
         db.rollback()
-        raise HTTPException(status_code=400, detail="Pago rechazado por el sistema")
-    db.add(nuevo_pago)
-
-    # ── 5. Registrar Venta (Estado final y Ticket) ──
-    nueva_venta.registrarVenta() # Estado: "Finalizada"
-    
-    db.commit()
-    db.refresh(ticket)
-    
-    ticket.generarPDF()
-    ticket.imprimir()
-
-    # ── 6. Coordinar Finalización (GestorMonedero) ──
-    gestor.coordinarFinalizacion()
-
-    # ── 7. Emitir respuesta con Ticket + comprobante de Monedero ──
-    return schemas.VentaDulceriaResponse(
-        id_venta=nueva_venta.id_venta,
-        total=nueva_venta.total,
-        estado=nueva_venta.estado,
-        mensaje="Venta registrada exitosamente.",
-        monedero=comprobante_monedero
-    )
+        raise http_exc
+    except Exception as e:
+        # Fallo crítico de integridad (ej: constraint fail, db bloqueada)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Transacción abortada: {str(e)}")
