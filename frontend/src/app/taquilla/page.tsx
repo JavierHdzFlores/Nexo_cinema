@@ -16,10 +16,13 @@ interface Funcion {
   id: number;
   pelicula: string;
   clasificacion: string;
+  duracion_minutos?: number;
   fecha_hora_inicio: string;
   precio_boleto: number;
   id_sala: number;
   sala_nombre: string;
+  sala_tipo?: string;
+  sala_capacidad?: number;
   imagen_url?: string;
 }
 
@@ -333,6 +336,11 @@ export default function TaquillaPage() {
                     <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
                       <Film className="w-4 h-4 text-[#f9a825]" />
                       <span className="text-white font-medium">{funcionSeleccionada.sala_nombre}</span>
+                      {funcionSeleccionada.sala_tipo && funcionSeleccionada.sala_tipo !== "Tradicional" && (
+                        <span className="ml-1 text-[9px] font-black bg-[#f9a825] text-black px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                          {funcionSeleccionada.sala_tipo}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
                       <span className="text-[11px] font-bold text-white uppercase tracking-wider">{funcionSeleccionada.clasificacion}</span>

@@ -5,10 +5,13 @@ interface Funcion {
   id: number;
   pelicula: string;
   clasificacion: string;
+  duracion_minutos?: number;
   fecha_hora_inicio: string;
   precio_boleto: number;
   id_sala: number;
   sala_nombre: string;
+  sala_tipo?: string;
+  sala_capacidad?: number;
   imagen_url?: string;
 }
 
@@ -18,9 +21,17 @@ interface FuncionCardProps {
   formatearFecha: (iso: string) => string;
 }
 
+// Colores por tipo de sala
+const SALA_TIPO_STYLES: Record<string, { bg: string; text: string; border: string; glow: string }> = {
+  "IMAX":        { bg: "bg-blue-500/20",   text: "text-blue-300",   border: "border-blue-500/40",   glow: "shadow-[0_0_8px_rgba(59,130,246,0.5)]" },
+  "VIP":         { bg: "bg-purple-500/20", text: "text-purple-300", border: "border-purple-500/40", glow: "shadow-[0_0_8px_rgba(168,85,247,0.5)]" },
+  "Macro XE":    { bg: "bg-cyan-500/20",   text: "text-cyan-300",   border: "border-cyan-500/40",   glow: "shadow-[0_0_8px_rgba(6,182,212,0.5)]" },
+  "Tradicional": { bg: "bg-white/5",       text: "text-zinc-400",   border: "border-white/10",       glow: "" },
+};
+
 export function FuncionCard({ funcion, onClick, formatearFecha }: FuncionCardProps) {
-  // Use a fallback image if none provided
   const bgImage = funcion.imagen_url || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&q=80&w=400&h=600";
+  const tipoStyle = SALA_TIPO_STYLES[funcion.sala_tipo || "Tradicional"] || SALA_TIPO_STYLES["Tradicional"];
 
   return (
     <motion.button
@@ -28,10 +39,7 @@ export function FuncionCard({ funcion, onClick, formatearFecha }: FuncionCardPro
       whileTap={{ scale: 0.98 }}
       onClick={() => onClick(funcion)}
       className="relative text-left rounded-2xl overflow-hidden transition-all group flex flex-col justify-end"
-      style={{
-        height: "360px",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-      }}
+      style={{ height: "360px", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}
     >
       {/* Background Image */}
       <div 
@@ -44,7 +52,7 @@ export function FuncionCard({ funcion, onClick, formatearFecha }: FuncionCardPro
 
       {/* Content */}
       <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-        {/* Top Section: Price and Classification */}
+        {/* Top: clasificación + precio */}
         <div className="flex justify-between items-start">
           <span className="text-[10px] font-bold text-white bg-[#f9a825] px-2 py-1 rounded shadow-lg uppercase tracking-widest">
             {funcion.clasificacion}
@@ -54,16 +62,27 @@ export function FuncionCard({ funcion, onClick, formatearFecha }: FuncionCardPro
           </span>
         </div>
 
-        {/* Bottom Section */}
+        {/* Bottom */}
         <div className="flex flex-col gap-3">
           <div>
             <h3 className="text-2xl font-bold text-white leading-none uppercase tracking-wide line-clamp-2" style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: "0.05em" }}>
               {funcion.pelicula}
             </h3>
-            <div className="mt-2 flex items-center gap-2">
+            {/* Sala + Tipo */}
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-bold text-[#f9a825] uppercase tracking-widest bg-[#f9a825]/10 px-2 py-0.5 rounded border border-[#f9a825]/20">
                 {funcion.sala_nombre}
               </span>
+              {funcion.sala_tipo && funcion.sala_tipo !== "Tradicional" && (
+                <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${tipoStyle.bg} ${tipoStyle.text} ${tipoStyle.border} ${tipoStyle.glow}`}>
+                  {funcion.sala_tipo}
+                </span>
+              )}
+              {funcion.duracion_minutos && (
+                <span className="text-[10px] text-zinc-500 font-medium">
+                  {funcion.duracion_minutos} min
+                </span>
+              )}
             </div>
           </div>
 

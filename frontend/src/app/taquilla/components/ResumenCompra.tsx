@@ -5,6 +5,7 @@ interface Funcion {
   pelicula: string;
   fecha_hora_inicio: string;
   sala_nombre: string;
+  sala_tipo?: string;
   precio_boleto: number;
 }
 
@@ -62,7 +63,14 @@ export function ResumenCompra({
         <div className="p-8 border-b border-white/5">
           <h3 className="text-xs font-semibold text-[#f9a825] uppercase tracking-[0.2em] mb-4">Resumen de Transacción</h3>
           <p className="text-2xl font-bold mb-1 tracking-tight text-white">{funcionSeleccionada.pelicula}</p>
-          <p className="text-sm text-gray-400">{formatearFecha(funcionSeleccionada.fecha_hora_inicio)} · {funcionSeleccionada.sala_nombre}</p>
+          <p className="text-sm text-gray-400">
+            {formatearFecha(funcionSeleccionada.fecha_hora_inicio)} · {funcionSeleccionada.sala_nombre}
+            {funcionSeleccionada.sala_tipo && funcionSeleccionada.sala_tipo !== "Tradicional" && (
+              <span className="ml-2 text-[8px] bg-white/10 text-zinc-300 px-1.5 py-0.5 rounded border border-white/10">
+                {funcionSeleccionada.sala_tipo}
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="p-8 border-b border-white/5 space-y-4">

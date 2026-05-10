@@ -5,7 +5,7 @@ from datetime import timedelta # <-- NUEVO: Para sumar los minutos de duración 
 
 # Ajusta las importaciones según tu estructura
 from database import get_db 
-from models import ProyeccionPublica, Evento # <-- NUEVO: Importamos Evento para checar empalmes
+from models import ProyeccionPublica, Evento, Pelicula, EventoPrivado, Sala
 import schemas
 
 router = APIRouter(
@@ -25,6 +25,27 @@ def obtener_cartelera(db: Session = Depends(get_db)):
         
     return proyecciones
 
+@router.get("/peliculas", response_model=List[schemas.PeliculaResponse])
+def obtener_catalogo_peliculas(db: Session = Depends(get_db)):
+    """
+    Obtiene el catálogo maestro de películas para programar funciones
+    """
+    peliculas = db.query(Pelicula).all()
+    if not peliculas:
+        raise HTTPException(status_code=404, detail="No hay películas en el catálogo")
+    return peliculas
+
+@router.get("/salas", response_model=List[schemas.SalaResponse])
+def obtener_salas(db: Session = Depends(get_db)):
+    """
+    Devuelve el catálogo de salas del cine.
+    Compartido con Taquilla: ambos módulos referencian la misma tabla salas.
+    """
+    salas = db.query(Sala).order_by(Sala.id_sala).all()
+    if not salas:
+        raise HTTPException(status_code=404, detail="No hay salas registradas")
+    return salas
+
 
 # ==========================================
 # POST: PROGRAMAR NUEVA FUNCIÓN (CU-01)
@@ -35,13 +56,16 @@ def programar_funcion(funcion: schemas.ProyeccionPublicaCreate, db: Session = De
     Permite al Supervisor programar una nueva función evitando empalmes.
     Calcula automáticamente el tiempo de limpieza.
     """
-    # 1. Calcular la hora de fin (Duración de la peli + 30 min de limpieza)
-    tiempo_total_minutos = funcion.duracion_minutos + 30
+    # 0. Obtener los datos reales de la película desde el catálogo
+    pelicula_db = db.query(Pelicula).filter(Pelicula.id_pelicula == funcion.id_pelicula).first()
+    if not pelicula_db:
+        raise HTTPException(status_code=404, detail="La película seleccionada no existe en el catálogo")
+
+    # 1. Calcular la hora de fin (Duración del catálogo + 30 min de limpieza)
+    tiempo_total_minutos = pelicula_db.duracion_minutos + 30
     fecha_hora_fin_calculada = funcion.fecha_hora_inicio + timedelta(minutes=tiempo_total_minutos)
 
     # 2. Validar empalmes en la misma sala (Regla de negocio / Excepción E1)
-    # La fórmula mágica: Un empalme ocurre si un evento existente en la sala
-    # empieza ANTES de que termine el nuevo, Y termina DESPUÉS de que empiece el nuevo.
     empalme = db.query(Evento).filter(
         Evento.id_sala == funcion.id_sala,
         Evento.fecha_hora_inicio < fecha_hora_fin_calculada,
@@ -57,13 +81,11 @@ def programar_funcion(funcion: schemas.ProyeccionPublicaCreate, db: Session = De
     # 3. Si no hay empalme, crear la nueva proyección
     nueva_proyeccion = ProyeccionPublica(
         id_sala=funcion.id_sala,
-        nombre=funcion.nombre,
+        nombre=f"Función: {pelicula_db.titulo}",
         fecha_hora_inicio=funcion.fecha_hora_inicio,
-        fecha_hora_fin=fecha_hora_fin_calculada, # <- Insertamos la fecha que el backend calculó
-        pelicula=funcion.pelicula,
-        clasificacion=funcion.clasificacion,
-        precio_boleto=funcion.precio_boleto,
-        duracion_minutos=funcion.duracion_minutos
+        fecha_hora_fin=fecha_hora_fin_calculada, 
+        id_pelicula=funcion.id_pelicula,
+        precio_boleto=funcion.precio_boleto
     )
 
     # 4. Guardar en BD

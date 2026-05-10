@@ -16,24 +16,50 @@ class ProyeccionPublicaResponse(EventoBase):
     pelicula: str
     clasificacion: Optional[str] = None
     precio_boleto: float
-
-    # Esto permite que Pydantic lea directamente desde el modelo de SQLAlchemy
-    class Config:
-        from_attributes = True
-
 # ==========================================
 # ESQUEMAS PARA GESTIÓN DE CARTELERA (CU-01)
 # ==========================================
 
-class ProyeccionPublicaCreate(BaseModel):
-    """Esquema para cuando el Supervisor programa una nueva función"""
-    id_sala: int
-    nombre: str # Ej: "Estreno Spiderman"
-    fecha_hora_inicio: datetime
-    pelicula: str
-    clasificacion: Optional[str] = None
-    precio_boleto: float
+class PeliculaResponse(BaseModel):
+    id_pelicula: int
+    titulo: str
+    sinopsis: Optional[str]
+    clasificacion: str
     duracion_minutos: int
+    imagen_url: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class SalaResponse(BaseModel):
+    id_sala: int
+    nombre: str
+    capacidad: int
+    tipo: Optional[str] = None
+    estado: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+# ==========================================
+# ESQUEMAS PARA PROYECCIONES PÚBLICAS
+# ==========================================
+class ProyeccionPublicaResponse(EventoBase):
+    id_proyeccion: int
+    id_pelicula: int
+    precio_boleto: float
+    pelicula_obj: Optional[PeliculaResponse] = None # Relación opcional para traer los datos del catálogo
+    imagen_url: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class ProyeccionPublicaCreate(BaseModel):
+    """Esquema para cuando el Supervisor programa una nueva función usando el catálogo"""
+    id_sala: int
+    id_pelicula: int
+    fecha_hora_inicio: datetime
+    precio_boleto: float
 
 # ==========================================
 # ESQUEMAS PARA USUARIOS / CLIENTES (Ejemplo para cuando los necesites)

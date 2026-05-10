@@ -180,16 +180,30 @@ class Evento(Base):
             "tipo_evento": self.tipo_evento
         }
 
+# ==========================================
+# CATÁLOGO DE PELÍCULAS (Base de la Cartelera Inteligente)
+# ==========================================
+class Pelicula(Base):
+    __tablename__ = "peliculas"
+    id_pelicula = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    titulo = Column(String(150), nullable=False, unique=True)
+    sinopsis = Column(String(500), nullable=True)
+    clasificacion = Column(String(10), nullable=False) # A, B, B15, C
+    duracion_minutos = Column(Integer, nullable=False)
+    imagen_url = Column(String(255), nullable=True)
+    
+    # Efecto espejo a proyecciones
+    proyecciones = relationship("ProyeccionPublica", back_populates="pelicula_obj")
+
 
 class ProyeccionPublica(Evento):
     __tablename__ = "proyecciones_publicas"
     id_proyeccion = Column(Integer, ForeignKey("eventos.id_evento"), primary_key=True)
-    pelicula = Column(String(100), nullable=False)
-    clasificacion = Column(String(10))
+    id_pelicula = Column(Integer, ForeignKey("peliculas.id_pelicula"), nullable=False)
     precio_boleto = Column(Float, nullable=False)
-    # NUEVA COLUMNA: Necesaria para el cálculo del CU-01
-    duracion_minutos = Column(Integer, nullable=False) 
-    imagen_url = Column(String(255), nullable=True) # Soporte para imágenes de carteleras
+    
+    # Relación al catálogo maestro
+    pelicula_obj = relationship("Pelicula", back_populates="proyecciones")
 
     __mapper_args__ = {"polymorphic_identity": "proyeccion_publica"}
 

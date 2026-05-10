@@ -25,13 +25,16 @@ def listar_funciones(db: Session = Depends(get_db)):
     return [
         {
             "id": f.id_evento,
-            "pelicula": f.pelicula,
-            "clasificacion": f.clasificacion,
+            "pelicula": f.pelicula_obj.titulo if f.pelicula_obj else "Desconocida",
+            "clasificacion": f.pelicula_obj.clasificacion if f.pelicula_obj else "",
+            "duracion_minutos": f.pelicula_obj.duracion_minutos if f.pelicula_obj else None,
             "fecha_hora_inicio": f.fecha_hora_inicio,
             "precio_boleto": f.precio_boleto,
             "id_sala": f.id_sala,
             "sala_nombre": f.sala.nombre if f.sala else "Sin sala",
-            "imagen_url": f.imagen_url
+            "sala_tipo": f.sala.tipo if f.sala else None,
+            "sala_capacidad": f.sala.capacidad if f.sala else None,
+            "imagen_url": f.pelicula_obj.imagen_url if f.pelicula_obj else ""
         }
         for f in funciones
     ]
