@@ -128,6 +128,8 @@ class ArticuloDulceriaResponse(BaseModel):
     nombre: str
     precio: float
     tipo_articulo: str
+    stock_actual: int
+    stock_minimo: int
 
     class Config:
         from_attributes = True
@@ -139,6 +141,7 @@ class DetalleVentaRequest(BaseModel):
 class VentaDulceriaRequest(BaseModel):
     id_cliente: Optional[int] = None
     detalles: list[DetalleVentaRequest]
+    metodo_pago: str = "Efectivo"
     usar_puntos: bool = False
     puntos_a_usar: Optional[int] = 0
 
@@ -159,23 +162,28 @@ class VentaDulceriaResponse(BaseModel):
     mensaje: str
     # CU-06: Comprobante de monedero (Optional — solo si hubo cliente identificado)
     monedero: Optional[MovimientoMonederoResponse] = None
-# Representa el Diagrama de Clases con Responsabilidades (Entrada)
+# ==========================================
+# ESQUEMAS PARA TAQUILLA (CU-04)
+# ==========================================
+class BloqueoAsientosRequest(BaseModel):
+    id_evento: int
+    ids_asientos: list[int]
+    id_cliente_temp: str  # Un UUID o string generado en el frontend para rastrear quién bloqueó
+
 class VentaTaquillaRequest(BaseModel):
-    id_taquillero: int
-    id_evento: int  
+    id_evento: int
     ids_asientos: list[int]
     metodo_pago: str
+    id_cliente_temp: str  # Debe coincidir con el que bloqueó
+    id_taquillero: Optional[int] = None
+    id_cliente: Optional[int] = None
 
-# Representa el Diagrama de Comunicación (Salida)
 class VentaTaquillaResponse(BaseModel):
     id_venta: int
-    id_empleado: int
-    fecha_venta: datetime
     total: float
-    metodo_pago: str
-
-    class Config:
-        from_attributes = True
+    estado: str
+    mensaje: str
+    boletos_generados: int
 
 # Para listar funciones en la cartelera del taquillero
 class FuncionTaquillaResponse(BaseModel):
@@ -186,3 +194,30 @@ class FuncionTaquillaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ==========================================
+# ESQUEMAS PARA EVENTOS PRIVADOS (CU-02)
+# ==========================================
+class EventoPrivadoCreate(BaseModel):
+    id_sala: int
+    nombre_evento: str
+    fecha_hora_inicio: datetime
+    fecha_hora_fin: datetime
+    organizador: str
+    motivo: str
+    req_microfonos: bool = False
+    req_catering: bool = False
+    req_iluminacion: bool = False
+    costo_base_hora: float = 1000.0  # El precio que le cobren por hora a la sala
+
+# ==========================================
+# ESQUEMAS PARA COTIZACIONES (CU-03)
+# ==========================================
+class CotizacionCreate(BaseModel):
+    nombre_cliente: str
+    id_sala: int
+    fecha_hora_inicio: datetime
+    fecha_hora_fin: datetime
+    asistentes: int
+    paquete_dulceria: str  # Ej: "Basico", "Premium", "VIP"
+    costo_base_hora: float = 1000.0 # Precio de la sala por hora

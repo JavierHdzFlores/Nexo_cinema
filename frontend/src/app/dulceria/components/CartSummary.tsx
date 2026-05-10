@@ -1,5 +1,8 @@
 'use client';
 
+import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+
 /**
  * CartSummary.tsx
  * Representa visualmente el estado del objeto "v : Venta" durante la fase EnCarga.
@@ -8,33 +11,32 @@
  *   - Dispara la transición EnCarga → ValidandoStock al confirmar el cobro.
  */
 
-import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import type { CartItem } from '../types';
+import { useCart } from '../layout';
 
 interface CartSummaryProps {
-  items: CartItem[];
   total: number;
   descuentoPuntos: number;
   granTotal: number;
-  usarPuntos: boolean;
-  onAdd: (id: number, nombre: string, precio: number) => void;
-  onSubtract: (id: number) => void;
   onClearCart: () => void;
   onCheckout: () => void;
 }
 
 export function CartSummary({
-  items,
   total,
   descuentoPuntos,
   granTotal,
-  usarPuntos,
-  onAdd,
-  onSubtract,
   onClearCart,
   onCheckout,
 }: CartSummaryProps) {
+  const { carrito: items, agregarProducto, restarProducto, operacion, puntosDisponibles, idCliente } = useCart();
+
+  // Helper para manejar el onAdd antiguo (id, nombre, precio) -> nuevo (producto completo)
+  // Pero aquí solo tenemos el ID del item del carrito.
+  const handleSubtract = (id: number) => restarProducto(id);
+  const handleAdd = (id: number) => {
+    const item = items.find(i => i.id_articulo === id);
+    if (item) agregarProducto(item);
+  };
   return (
     <aside
       className="w-[360px] shrink-0 sticky top-[65px] h-[calc(100vh-65px)] flex flex-col border-l border-white/5"
@@ -50,10 +52,29 @@ export function CartSummary({
         </h2>
         {items.length > 0 && (
           <button
-            onClick={onClearCart}
-            className="text-[10px] font-medium uppercase tracking-widest text-white/20 hover:text-red-400/70 transition-colors"
+            onClick={() => {
+              if (window.confirm('¿Está seguro de que desea abandonar la carga y limpiar el ticket?')) {
+                onClearCart();
+              }
+            }}
+            className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all"
+            style={{
+              color: 'rgba(255,100,100,0.8)',
+              background: 'rgba(255,80,80,0.08)',
+              border: '1px solid rgba(255,80,80,0.2)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,80,80,0.18)';
+              e.currentTarget.style.color = '#ff6464';
+              e.currentTarget.style.borderColor = 'rgba(255,80,80,0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,80,80,0.08)';
+              e.currentTarget.style.color = 'rgba(255,100,100,0.8)';
+              e.currentTarget.style.borderColor = 'rgba(255,80,80,0.2)';
+            }}
           >
-            Limpiar
+            🗑 Limpiar
           </button>
         )}
       </div>
@@ -103,7 +124,7 @@ export function CartSummary({
                 <div className="flex items-center gap-1 rounded-lg border border-white/6 p-0.5"
                   style={{ background: 'rgba(255,255,255,0.03)' }}>
                   <button
-                    onClick={() => onSubtract(item.id_articulo)}
+                    onClick={() => handleSubtract(item.id_articulo)}
                     className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:bg-white/8 hover:text-white transition-colors text-sm leading-none"
                   >
                     −
@@ -112,7 +133,7 @@ export function CartSummary({
                     {item.cantidad}
                   </span>
                   <button
-                    onClick={() => onAdd(item.id_articulo, item.nombre, item.precio)}
+                    onClick={() => handleAdd(item.id_articulo)}
                     className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:bg-white/8 hover:text-white transition-colors text-sm leading-none"
                   >
                     +
@@ -131,13 +152,40 @@ export function CartSummary({
 
       {/* Totales y acción de cobro */}
       <div className="px-6 py-5 border-t border-white/5 space-y-4">
+        {/* Mejora Dinámica: Puntos (Awareness vs Ahorro) */}
+        {total > 0 && idCliente && (
+          <div className="px-6 -mx-6 py-3 bg-[#f9a825]/5 border-t border-b border-[#f9a825]/10 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
+              {operacion === 'acumular' ? 'Puntos a ganar' : 'Puntos a canjear'}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className={`text-sm font-bold ${operacion === 'acumular' ? 'text-[#f9a825]' : 'text-red-400'}`}>
+                {operacion === 'acumular' 
+                  ? `+${Math.floor(total * 0.05)}` 
+                  : `-${Math.min(puntosDisponibles, Math.floor(total))}`}
+              </span>
+              <span className={`text-[10px] font-bold uppercase ${operacion === 'acumular' ? 'text-[#f9a825]/60' : 'text-red-400/60'}`}>
+                pts
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Mejora: Si no hay cliente, incentivar el registro */}
+        {total > 0 && !idCliente && (
+          <div className="px-6 -mx-6 py-3 bg-white/5 border-t border-b border-white/5 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wider text-white/20 font-medium italic">Gana puntos en esta compra</span>
+            <span className="text-[10px] font-bold text-[#f9a825]">+{Math.floor(total * 0.05)} pts</span>
+          </div>
+        )}
+
         {/* Desglose */}
         <div className="space-y-2 text-xs font-mono">
           <div className="flex justify-between text-white/30">
             <span>Subtotal</span>
             <span>${total.toFixed(2)}</span>
           </div>
-          {usarPuntos && descuentoPuntos > 0 && (
+          {operacion === 'canjear' && descuentoPuntos > 0 && (
             <div className="flex justify-between" style={{ color: '#f9a825' }}>
               <span>Descuento puntos</span>
               <span>−${descuentoPuntos.toFixed(2)}</span>

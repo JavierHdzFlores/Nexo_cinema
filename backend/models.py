@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 from pydantic import BaseModel
@@ -189,6 +189,7 @@ class ProyeccionPublica(Evento):
     precio_boleto = Column(Float, nullable=False)
     # NUEVA COLUMNA: Necesaria para el cálculo del CU-01
     duracion_minutos = Column(Integer, nullable=False) 
+    imagen_url = Column(String(255), nullable=True) # Soporte para imágenes de carteleras
 
     __mapper_args__ = {"polymorphic_identity": "proyeccion_publica"}
 
@@ -198,99 +199,111 @@ class EventoPrivado(Evento):
     organizador = Column(String(100))
     motivo = Column(String(200))
     costo_renta = Column(Float, nullable=False)
+    
+    # NUEVOS CAMPOS (CU-02: Servicios Adicionales)
+    req_microfonos = Column(Boolean, default=False)
+    req_catering = Column(Boolean, default=False)
+    req_iluminacion = Column(Boolean, default=False)
 
     __mapper_args__ = {"polymorphic_identity": "evento_privado"}
 
 
+# ==========================================
+# ACTUALIZACIÓN EN LA TABLA VENTA
+# ==========================================
 class Venta(Base):
     __tablename__ = "ventas"
     id_venta = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), nullable=True)
     id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=True)
+    id_empleado = Column(Integer, ForeignKey("empleados.id_empleado"), nullable=True) # NUEVO
     fecha_venta = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     total = Column(Float, nullable=False)
-    estado = Column(String(50), default="Iniciada")
-    id_empleado = Column(Integer, ForeignKey("empleados.id_empleado"), nullable=True)
+    metodo_pago = Column(String(50), nullable=False) # NUEVO: Efectivo, Tarjeta, etc.
+    estado = Column(String(20), default="Completada") # NUEVO
     
-    # Relaciones actualizadas a back_populates
     cliente = relationship("Cliente", back_populates="ventas")
     evento = relationship("Evento", back_populates="ventas")
-    vendedor = relationship("Empleado")
     factura_individual = relationship("FacturaIndividual", uselist=False, back_populates="venta")   
-    
-    def obtenerDatosVenta(self) -> dict:
-        return {
-            "id_venta": self.id_venta,
-            "id_cliente": self.id_cliente,
-            "id_evento": self.id_evento,
-            "fecha_venta": self.fecha_venta,
-            "total": self.total,
-            "estado": self.estado,
-            "cliente": {
-                "nombre": self.cliente.nombre if self.cliente else None,
-                "correo": self.cliente.correo if self.cliente else None,
-                "rfc": self.cliente.rfc if self.cliente else None
-            } if self.cliente else None,
-            "evento": {
-                "nombre": self.evento.nombre if self.evento else None,
-                "tipo": self.evento.tipo_evento if self.evento else None,
-                "fecha": self.evento.fecha_hora_inicio if self.evento else None
-            } if self.evento else None
-        }
+    boletos = relationship("Boleto", back_populates="venta") # NUEVO
 
+    # ── Diagrama 4 (Clases Detallado): +flush_para_id() ──
+    def flush_para_id(self, db) -> None:
+        """Sincroniza la venta con BD para obtener el ID antes del commit final"""
+        db.add(self)
+        db.flush()
+
+    # Métodos de Estado (Máquina de Estados)
     def iniciarVenta(self):
         self.estado = "Iniciada"
-
-    def agregarDetalle(self, articulo: "ArticuloDulceria", cant: int) -> "DetalleVenta":
-        self.estado = "EnCarga"
+        
+    def agregarDetalle(self, articulo, cantidad: int):
         detalle = DetalleVenta(
             id_venta=self.id_venta,
             id_articulo=articulo.id_articulo,
-            cantidad=cant,
-            subtotal=0.0
+            cantidad=cantidad,
+            articulo=articulo
         )
-        detalle.articulo = articulo
         detalle.calcularSubtotal()
         return detalle
 
-    def calcularTotal(self, detalles: list["DetalleVenta"]) -> float:
-        self.total = sum(d.subtotal for d in detalles)
+    def calcularTotal(self, detalles: list) -> float:
+        self.total = sum(detalle.subtotal for detalle in detalles)
         return self.total
-
-    def procesarPago(self) -> bool:
+        
+    def procesarPago(self):
         self.estado = "PendienteDePago"
-        return True # Se coordina externamente con Pago.autorizarPago()
-
+        
     def registrarVenta(self):
         self.estado = "Finalizada"
-# Agrégalo debajo de la clase Venta
-class Funcion(Base):
-    __tablename__ = "funciones"
-    id_funcion = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_proyeccion = Column(Integer, ForeignKey("proyecciones_publicas.id_proyeccion"))
-    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
-    horario = Column(DateTime)
-    
-    # Relaciones
-    asientos = relationship("Asiento", back_populates="funcion")
 
+# ==========================================
+# NUEVAS TABLAS: ASIENTO Y BOLETO (CU-04)
+# ==========================================
 class Asiento(Base):
     __tablename__ = "asientos"
     id_asiento = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_funcion = Column(Integer, ForeignKey("funciones.id_funcion"))
-    numero = Column(String(10))
-    estado = Column(String(20), default="disponible") # disponible, bloqueado, ocupado
+    id_sala = Column(Integer, ForeignKey("salas.id_sala"), nullable=False)
+    numero = Column(String(10), nullable=False) # Ej: A1, G5
     
-    funcion = relationship("Funcion", back_populates="asientos")
+    sala = relationship("Sala")
 
 class Boleto(Base):
     __tablename__ = "boletos"
     id_boleto = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_venta = Column(Integer, ForeignKey("ventas.id_venta"))
-    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"))
-    id_funcion = Column(Integer, ForeignKey("funciones.id_funcion"))
+    id_venta = Column(Integer, ForeignKey("ventas.id_venta"), nullable=False)
+    id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=False)
+    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"), nullable=False)
+    precio_final = Column(Float, nullable=False)
     
-    venta = relationship("Venta")
+    venta = relationship("Venta", back_populates="boletos")
+    evento = relationship("Evento")
+    asiento = relationship("Asiento")
+
+    # REGLA DE NEGOCIO: Evitar duplicidad de asientos en tiempo real
+    __table_args__ = (
+        UniqueConstraint('id_evento', 'id_asiento', name='uix_evento_asiento'),
+    )
+
+class BloqueoAsiento(Base):
+    """
+    Entidad adicional requerida por Regla de Negocio 1 y 2.
+    Maneja el bloqueo temporal durante la selección concurrente (Excepciones E1 y E2).
+    """
+    __tablename__ = "bloqueos_asientos"
+    id_bloqueo = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=False)
+    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"), nullable=False)
+    fecha_expiracion = Column(DateTime, nullable=False)
+    # Identificador de sesión o cliente para saber quién lo bloqueó
+    id_cliente_temp = Column(String(100), nullable=False) 
+
+    evento = relationship("Evento")
+    asiento = relationship("Asiento")
+
+    __table_args__ = (
+        UniqueConstraint('id_evento', 'id_asiento', name='uix_bloqueo_evento_asiento'),
+    )
 
 # ============================================================================
 # MÓDULO DE FACTURACIÓN
@@ -455,18 +468,16 @@ class ArticuloDulceria(Base):
     precio = Column(Float, nullable=False)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, default=10) # Para las alertas de inventario
+    tipo_articulo = Column(String(50)) # Discriminador para herencia
 
+    __mapper_args__ = {
+        "polymorphic_identity": "articulo",
+        "polymorphic_on": tipo_articulo,
+    }
+    
+    def obtenerPrecio(self) -> float:
+        return self.precio
 
-class RegistroLimpieza(Base):
-    __tablename__ = "registros_limpieza"
-
-    id_registro = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
-    fecha_inicio = Column(DateTime, default=datetime.datetime.utcnow)
-    fecha_fin = Column(DateTime, nullable=True)
-    duracion = Column(Float, nullable=True)
-
-    sala = relationship("Sala", backref="registros_limpieza")
 
 class RegistroLimpieza(Base):
     __tablename__ = "registros_limpieza"
@@ -512,15 +523,7 @@ class AlertaStock(Base):
     activa = Column(Boolean, default=True)
 
     insumo = relationship("Insumo", backref="alertas")
-    tipo_articulo = Column(String(50)) # Discriminador para herencia
 
-    __mapper_args__ = {
-        "polymorphic_identity": "articulo",
-        "polymorphic_on": tipo_articulo,
-    }
-    
-    def obtenerPrecio(self) -> float:
-        return self.precio
 
 class ProductoIndividual(ArticuloDulceria):
     __tablename__ = "productos_individuales"
@@ -546,7 +549,7 @@ class Combo(ArticuloDulceria):
     def obtenerProductos(self) -> list:
         return self.productos_combo
 
-class Insumo(Base):
+class InsumoDulceria(Base):
     __tablename__ = "insumos_dulceria"
     id_insumo = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
@@ -571,7 +574,7 @@ class RecetaInsumo(Base):
     cantidad_requerida = Column(Float, nullable=False)
     
     producto = relationship("ProductoIndividual", back_populates="receta")
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
 
 class ComboProducto(Base):
     """Asociación Muchos a Muchos entre Combo y ProductoIndividual"""
@@ -620,7 +623,7 @@ class LogMovimiento(Base):
     accion = Column(String(200), nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
     
     def guardarRegistro(self, db):
         db.add(self)
@@ -659,27 +662,27 @@ class Monedero(Base):
     __tablename__ = "monederos"
     id_monedero = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), unique=True, nullable=False)
-    saldoPuntos = Column(Integer, default=0, nullable=False)
-    fechaVencimiento = Column(DateTime)
+    saldo_puntos = Column(Integer, default=0, nullable=False)
+    fecha_vencimiento = Column(DateTime)
     estado = Column(String(50), default="Operativa") # "Operativa", "Vencida", "Bloqueada"
 
     # El Cliente "posee" 1 Monedero (backref crea la relación bidireccional sin tocar la clase Cliente)
     cliente = relationship("Cliente", backref="monedero_obj")
 
     def consultarSaldo(self) -> int:
-        return self.saldoPuntos
+        return self.saldo_puntos
 
     def validarSaldoSuficiente(self, monto: int) -> bool:
-        return self.saldoPuntos >= monto
+        return self.saldo_puntos >= monto
 
     def actualizarSaldo(self, monto: int, operacion: str) -> None:
         if operacion == "Canje":
             if self.validarSaldoSuficiente(monto):
-                self.saldoPuntos -= monto
+                self.saldo_puntos -= monto
             else:
                 raise ValueError("Saldo de puntos insuficiente")
         elif operacion == "Acumular":
-            self.saldoPuntos += monto
+            self.saldo_puntos += monto
 
     # Transiciones de Estado (Diagrama 7 Máquina de Estados CU-06)
     def expirarPlazo(self) -> None:
@@ -690,11 +693,11 @@ class Monedero(Base):
 
     def desbloquearCuenta(self) -> None:
         self.estado = "Operativa"
-        self.saldoPuntos = 0
+        self.saldo_puntos = 0
 
     def reiniciarPuntos(self) -> None:
         self.estado = "Operativa"
-        self.saldoPuntos = 0
+        self.saldo_puntos = 0
 
 class TransaccionPuntos(Base):
     __tablename__ = "transacciones_puntos"
@@ -787,6 +790,60 @@ class ReporteVentas(Base):
         # Lógica para calcular rentabilidad
         return 0.0
 
+
 # ============================================================================
-# MÓDULO DE CARTELERTA  CU-01
+# COTIZACION
 # ============================================================================
+class Cotizacion(Base):
+    """
+    CU-03: Almacena las cotizaciones de eventos corporativos.
+    No reserva la sala hasta que se pague.
+    """
+    __tablename__ = "cotizaciones"
+    id_cotizacion = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    nombre_cliente = Column(String(100), nullable=False)
+    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
+    fecha_hora_inicio = Column(DateTime, nullable=False)
+    fecha_hora_fin = Column(DateTime, nullable=False)
+    asistentes = Column(Integer, nullable=False)
+    paquete_dulceria = Column(String(100))
+    
+    # Costos desglosados
+    costo_sala = Column(Float, nullable=False)
+    costo_dulceria = Column(Float, nullable=False)
+    total = Column(Float, nullable=False)
+    
+    fecha_emision = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_vigencia = Column(DateTime, nullable=False)
+    estado = Column(String(20), default="Pendiente") # Pendiente, Pagada, Vencida
+
+    # Relación para poder acceder a los datos de la sala
+    sala = relationship("Sala")
+
+    # ── Diagrama 1 (Clases): +validar_vigencia() ──
+    def validar_vigencia(self) -> bool:
+        """
+        Verifica si la cotización sigue vigente.
+        Si ya expiró, transiciona el estado a 'Vencida' (Diagrama 6: vigencia_expirada).
+        Retorna True si la cotización aún es válida.
+        """
+        if datetime.datetime.utcnow() > self.fecha_vigencia:
+            self.estado = "Vencida"
+            return False
+        return True
+
+    # ── Diagrama 5 (Clases detallado): +crear_registro_db() : void ──
+    def crear_registro_db(self, db) -> None:
+        """Persiste la entidad de cotización en la base de datos."""
+        db.add(self)
+        db.commit()
+        db.refresh(self)
+
+    # ── Diagrama 6 (Máquina de Estados): Transiciones desde 'Pendiente' ──
+    def pago_confirmado(self) -> None:
+        """Transición: Pendiente → Pagada"""
+        self.estado = "Pagada"
+
+    def vigencia_expirada(self) -> None:
+        """Transición: Pendiente → Vencida"""
+        self.estado = "Vencida"

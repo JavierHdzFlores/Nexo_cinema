@@ -13,7 +13,7 @@
  *   Ticket.generarDetalle(saldoAnt, mov, saldoNvo) y Ticket.imprimir()
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import type { EstadoVenta, VentaDulceriaResponse, MovimientoMonederoResponse } from '../types';
 
@@ -23,7 +23,7 @@ interface PaymentModalProps {
   descuentoPuntos: number;
   granTotal: number;
   respuesta: VentaDulceriaResponse | null;
-  onConfirmarPago: () => void;
+  onConfirmarPago: (metodo: string) => void;
   onCancelar: () => void;
 }
 
@@ -38,6 +38,7 @@ export function PaymentModal({
   onConfirmarPago,
   onCancelar,
 }: PaymentModalProps) {
+  const [metodoPago, setMetodoPago] = useState<string>('Efectivo');
   if (!ESTADOS_VISIBLES.includes(estado)) return null;
 
   return (
@@ -73,9 +74,6 @@ export function PaymentModal({
           {estado === 'PendienteDePago' && (
             <div className="space-y-6">
               <div>
-                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#f9a825' }}>
-                  Paso 6 / CU-05
-                </span>
                 <h3 className="text-xl font-semibold text-white mt-1">Confirmar Cobro</h3>
                 <p className="text-xs text-white/30 mt-1">
                   Solicite al cliente insertar su tarjeta o entregar efectivo.
@@ -101,6 +99,23 @@ export function PaymentModal({
                 </div>
               </div>
 
+              {/* Selector de Método de Pago */}
+              <div className="flex bg-white/5 rounded-xl p-1">
+                {['Efectivo', 'Tarjeta'].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMetodoPago(m)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-all ${
+                      metodoPago === m
+                        ? 'bg-[rgba(249,168,37,0.1)] text-[#f9a825] border border-[#f9a825]/50 shadow-sm'
+                        : 'text-white/40 hover:text-white/70 border border-transparent'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex gap-3">
                 <button
                   onClick={onCancelar}
@@ -109,7 +124,7 @@ export function PaymentModal({
                   Cancelar
                 </button>
                 <button
-                  onClick={onConfirmarPago}
+                  onClick={() => onConfirmarPago(metodoPago)}
                   className="flex-[2] h-11 rounded-xl text-xs font-semibold uppercase tracking-widest transition-all active:scale-[0.97]"
                   style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)', color: '#000' }}
                 >
