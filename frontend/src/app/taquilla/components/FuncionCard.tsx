@@ -43,30 +43,36 @@ export function FuncionCard({ funcion, onClick, formatearFecha }: FuncionCardPro
       <div className="absolute inset-0 bg-gradient-to-t from-[#030213] via-[#030213]/80 to-transparent opacity-90" />
 
       {/* Content */}
-      <div className="relative z-10 p-5 w-full flex flex-col gap-2">
-        {/* Top Badges (Price / Room) */}
-        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-          <span className="text-sm font-bold text-white bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/10 shadow-lg">
-            <span style={{ color: "#f9a825" }}>$</span>{funcion.precio_boleto.toFixed(2)}
+      <div className="relative z-10 p-5 h-full flex flex-col justify-between">
+        {/* Top Section: Price and Classification */}
+        <div className="flex justify-between items-start">
+          <span className="text-[10px] font-bold text-white bg-[#f9a825] px-2 py-1 rounded shadow-lg uppercase tracking-widest">
+            {funcion.clasificacion}
           </span>
-          <span className="text-[10px] font-bold text-black uppercase tracking-widest px-2 py-1 rounded bg-[#f9a825] shadow-lg">
-            {funcion.sala_nombre}
+          <span className="text-sm font-bold text-white bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 shadow-xl">
+            <span style={{ color: "#f9a825" }}>$</span>{funcion.precio_boleto.toFixed(2)}
           </span>
         </div>
 
-        {/* Bottom Text */}
-        <div className="mt-auto">
-          {funcion.clasificacion && (
-            <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] mb-1" style={{ color: "#ff4e50" }}>
-              {funcion.clasificacion === 'A' ? 'Apta p/Todos' : funcion.clasificacion === 'B15' ? 'Drama · Ficción' : 'Restringida'}
-            </span>
-          )}
-          <h3 className="text-2xl font-bold text-white leading-tight uppercase tracking-wide" style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: "0.05em" }}>
-            {funcion.pelicula}
-          </h3>
-          <p className="text-xs text-gray-300 mt-2 font-medium">
-            {formatearFecha(funcion.fecha_hora_inicio)}
-          </p>
+        {/* Bottom Section */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <h3 className="text-2xl font-bold text-white leading-none uppercase tracking-wide line-clamp-2" style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: "0.05em" }}>
+              {funcion.pelicula}
+            </h3>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] font-bold text-[#f9a825] uppercase tracking-widest bg-[#f9a825]/10 px-2 py-0.5 rounded border border-[#f9a825]/20">
+                {funcion.sala_nombre}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#f9a825] shadow-[0_0_5px_#f9a825]"></div>
+            <p className="text-[10px] text-gray-300 font-bold tracking-[0.1em] uppercase">
+              {formatearFecha(funcion.fecha_hora_inicio)}
+            </p>
+          </div>
         </div>
       </div>
     </motion.button>

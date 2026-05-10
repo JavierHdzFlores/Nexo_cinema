@@ -7,6 +7,10 @@ Uso:
     ./.venv/bin/python seed_dulceria.py
 """
 import datetime
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database import SessionLocal, engine
 from models import Base, Cliente, ProductoIndividual, Combo, Monedero
 

@@ -37,18 +37,18 @@ def seed_taquilla():
         # 3. Crear Funciones (Proyecciones Públicas)
         funciones_existentes = db.query(ProyeccionPublica).count()
         if funciones_existentes == 0:
-            ahora = datetime.utcnow()
+            ahora = datetime.now().replace(second=0, microsecond=0)
             
             f1 = ProyeccionPublica(
                 id_sala=sala.id_sala,
                 nombre="Dune: Parte Dos - Estreno",
                 pelicula="Dune: Parte Dos",
-                fecha_hora_inicio=ahora + timedelta(hours=2),
-                fecha_hora_fin=ahora + timedelta(hours=5),
+                fecha_hora_inicio=ahora.replace(hour=14, minute=30),
+                fecha_hora_fin=ahora.replace(hour=17, minute=15),
                 tipo_evento="proyeccion_publica",
                 clasificacion="B15",
                 precio_boleto=120.00,
-                duracion_minutos=166,
+                duracion_minutos=165,
                 imagen_url="https://images.unsplash.com/photo-1542204165-65bf26472b9b?auto=format&fit=crop&q=80&w=400&h=600"
             )
             
@@ -56,8 +56,8 @@ def seed_taquilla():
                 id_sala=sala.id_sala,
                 nombre="Spider-Man: Across the Spider-Verse",
                 pelicula="Spider-Man: Across the Spider-Verse",
-                fecha_hora_inicio=ahora + timedelta(hours=6),
-                fecha_hora_fin=ahora + timedelta(hours=8, minutes=20),
+                fecha_hora_inicio=ahora.replace(hour=18, minute=0),
+                fecha_hora_fin=ahora.replace(hour=20, minute=20),
                 tipo_evento="proyeccion_publica",
                 clasificacion="A",
                 precio_boleto=90.00,
@@ -69,8 +69,8 @@ def seed_taquilla():
                 id_sala=sala.id_sala,
                 nombre="Oppenheimer - Función Especial",
                 pelicula="Oppenheimer",
-                fecha_hora_inicio=ahora + timedelta(days=1, hours=1),
-                fecha_hora_fin=ahora + timedelta(days=1, hours=4),
+                fecha_hora_inicio=ahora.replace(hour=21, minute=30),
+                fecha_hora_fin=ahora.replace(hour=23, minute=50),
                 tipo_evento="proyeccion_publica",
                 clasificacion="C",
                 precio_boleto=150.00,

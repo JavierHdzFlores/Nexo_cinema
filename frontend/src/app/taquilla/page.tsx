@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { Clock, Film } from "lucide-react";
 
 import { FuncionCard } from "./components/FuncionCard";
 import { MapaAsientos } from "./components/MapaAsientos";
@@ -208,18 +209,20 @@ export default function TaquillaPage() {
   return (
     <main className="min-h-screen text-white bg-[#030213]" style={{ fontFamily: "var(--font-inter)" }}>
       {/* ═══ HEADER CORPORATIVO ═══ */}
-      <header className="sticky top-0 z-50 border-b border-white/10 px-8 py-5 flex items-center justify-between"
+      <header className="sticky top-0 z-50 border-b border-white/10 px-6 py-4 flex items-center justify-between shadow-2xl"
         style={{ background: "rgba(3,2,19,0.85)", backdropFilter: "blur(16px)" }}>
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full flex items-center justify-center border border-white/10 shadow-[0_0_15px_rgba(249,168,37,0.3)]" style={{ background: "linear-gradient(135deg, #2a0800, #030213)" }}>
-            <span className="text-2xl">🎟️</span>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-[#f9a825]/30 shadow-[0_0_15px_rgba(249,168,37,0.2)]" style={{ background: "linear-gradient(135deg, rgba(249,168,37,0.2), rgba(0,0,0,0))" }}>
+            <Film className="w-5 h-5 text-[#f9a825]" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-wider text-white"
-              style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: "0.1em" }}>
-              NEXO <span style={{ color: "#f9a825" }}>CINEMA</span>
-            </h1>
-            <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em]">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-wider text-white leading-none"
+                style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: "0.05em" }}>
+                NEXO <span style={{ color: "#f9a825" }}>CINEMA</span>
+              </h1>
+            </div>
+            <p className="text-[9px] text-gray-400 uppercase tracking-[0.3em] font-semibold mt-0.5">
               Terminal Taquilla POS
             </p>
           </div>
@@ -297,18 +300,54 @@ export default function TaquillaPage() {
           <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="pb-32">
             
             {/* Cabecera de Función Elegida */}
-            <div className="mb-10 p-6 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-6"
-              style={{ background: "linear-gradient(90deg, rgba(255,255,255,0.02), transparent)", borderColor: "rgba(255,255,255,0.08)" }}>
-              <div>
-                <p className="text-[10px] text-[#f9a825] uppercase tracking-[0.2em] font-bold mb-1">Función en Curso</p>
-                <p className="text-2xl font-bold text-white tracking-tight">{funcionSeleccionada.pelicula}</p>
-                <p className="text-sm text-gray-400 mt-1">
-                  {formatearFecha(funcionSeleccionada.fecha_hora_inicio)} · Sala: <span className="text-white">{funcionSeleccionada.sala_nombre}</span>
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500 uppercase tracking-widest mb-1">Costo Unitario</p>
-                <p className="text-3xl font-bold text-white">${funcionSeleccionada.precio_boleto.toFixed(2)}</p>
+            <div className="mb-10 rounded-2xl overflow-hidden relative" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              {/* Glow background */}
+              <div className="absolute top-0 left-0 w-64 h-64 bg-[#f9a825]/10 blur-[100px] pointer-events-none rounded-full" />
+              
+              <div className="flex flex-col md:flex-row p-6 md:p-8 gap-6 md:gap-8 items-center relative z-10">
+                {/* Poster Thumbnail */}
+                {funcionSeleccionada.imagen_url && (
+                  <div className="flex-shrink-0 w-24 h-36 md:w-28 md:h-40 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-white/10">
+                    <img 
+                      src={funcionSeleccionada.imagen_url} 
+                      alt={funcionSeleccionada.pelicula}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                
+                {/* Info principal */}
+                <div className="flex-1 text-center md:text-left">
+                  <div className="inline-flex items-center justify-center md:justify-start gap-2 mb-2">
+                    <span className="w-2 h-2 rounded-full bg-[#f9a825] animate-pulse"></span>
+                    <p className="text-[10px] text-[#f9a825] uppercase tracking-[0.2em] font-bold">Función en Curso</p>
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-4" style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: '0.05em' }}>
+                    {funcionSeleccionada.pelicula}
+                  </h2>
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 md:gap-4 text-sm text-gray-300">
+                    <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
+                      <Clock className="w-4 h-4 text-[#f9a825]" />
+                      <span>{formatearFecha(funcionSeleccionada.fecha_hora_inicio)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
+                      <Film className="w-4 h-4 text-[#f9a825]" />
+                      <span className="text-white font-medium">{funcionSeleccionada.sala_nombre}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
+                      <span className="text-[11px] font-bold text-white uppercase tracking-wider">{funcionSeleccionada.clasificacion}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Precio */}
+                <div className="md:border-l md:border-white/10 md:pl-8 text-center md:text-right flex flex-col justify-center">
+                  <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold mb-2">Costo por Boleto</p>
+                  <p className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+                    <span className="text-[#f9a825] text-2xl mr-1">$</span>
+                    {funcionSeleccionada.precio_boleto.toFixed(2)}
+                  </p>
+                </div>
               </div>
             </div>
 
