@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 from pydantic import BaseModel
@@ -479,17 +479,6 @@ class ArticuloDulceria(Base):
         return self.precio
 
 
-class RegistroLimpieza(Base):
-    __tablename__ = "registros_limpieza"
-
-    id_registro = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
-    fecha_inicio = Column(DateTime, default=datetime.datetime.utcnow)
-    fecha_fin = Column(DateTime, nullable=True)
-    duracion = Column(Float, nullable=True)
-
-    sala = relationship("Sala", backref="registros_limpieza")
-
 
 class Insumo(Base):
     __tablename__ = "insumos"
@@ -755,8 +744,8 @@ class ReporteVentas(Base):
     idReporte = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_cine = Column(Integer, ForeignKey("cines.idCine"))
     id_gerente = Column(Integer, ForeignKey("gerentes.id_gerente"))
-    fechaInicio = Column(DateTime, nullable=False)
-    fechaFin = Column(DateTime, nullable=False)
+    fechaInicio = Column(Date, nullable=True)
+    fechaFin = Column(Date, nullable=True)
     tipoGrafica = Column(String(50))
 
     cine = relationship("Cine", back_populates="reportes")
@@ -766,12 +755,24 @@ class ReporteVentas(Base):
         if db is None:
             return {}
         
-        ventas = db.query(Venta).filter(
-            Venta.fecha_venta >= self.fechaInicio,
-            Venta.fecha_venta <= self.fechaFin
-        ).all()
+        query = db.query(Venta)
+        if self.fechaInicio:
+            query = query.filter(Venta.fecha_venta >= self.fechaInicio)
+        if self.fechaFin:
+            fin_dia = datetime.datetime.combine(self.fechaFin, datetime.time.max)
+            query = query.filter(Venta.fecha_venta <= fin_dia)
+            
+        ventas = query.all()
         
         total = sum(v.total for v in ventas)
+        
+        from collections import defaultdict
+        ventas_por_fecha = defaultdict(float)
+        for v in ventas:
+            dia = v.fecha_venta.strftime("%Y-%m-%d") if v.fecha_venta else "Desconocido"
+            ventas_por_fecha[dia] += float(v.total or 0.0)
+            
+        detalle_grafica = [{"fecha": k, "total": v} for k, v in sorted(ventas_por_fecha.items())]
         
         return {
             "idReporte": self.idReporte,
@@ -779,7 +780,8 @@ class ReporteVentas(Base):
             "fechaFin": self.fechaFin,
             "tipoGrafica": self.tipoGrafica,
             "cantidadVentas": len(ventas),
-            "totalVentas": total
+            "totalVentas": total,
+            "detalle": detalle_grafica
         }
 
     def calcularOcupacion(self, db) -> float:

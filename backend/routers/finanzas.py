@@ -67,9 +67,9 @@ class FacturaConfirmarRequest(BaseModel):
 
 class ReporteVentasRequest(BaseModel):
     id_gerente: int = Field(..., gt=0)
-    id_cine: int = Field(..., gt=0)
-    fechaInicio: datetime.datetime
-    fechaFin: datetime.datetime
+    id_cine: Optional[int] = None
+    fechaInicio: Optional[datetime.date] = None
+    fechaFin: Optional[datetime.date] = None
     tipoGrafica: str = Field(..., min_length=1)
 
 
@@ -218,10 +218,14 @@ def crear_factura_individual(
             detail=f"Gerente con ID {payload.id_gerente} no encontrado o no autorizado"
         )
     
-    # Crear la factura individual con el gerente
-    factura = models.FacturaIndividual(
-        tipo_servicio=payload.tipo_servicio,
-        id_gerente=payload.id_gerente
+    # Usar el método generarFactura del Gerente (según diagrama CU-09)
+    factura = gerente.generarFactura(
+        tipo_factura="individual",
+        datos={
+            "tipo_servicio": payload.tipo_servicio,
+            "id_cliente": payload.id_cliente,
+            "id_venta": payload.id_venta
+        }
     )
     
     # Validar y asociar cliente si se proporciona ID
@@ -299,10 +303,14 @@ def crear_factura_evento(
             detail=f"Evento con ID {payload.id_evento} no encontrado"
         )
     
-    # Crear factura de evento con el gerente
-    factura = models.FacturaEvento(
-        id_gerente=payload.id_gerente,
-        id_cliente=payload.id_cliente
+    # Usar el método generarFactura del Gerente (según diagrama CU-09)
+    factura = gerente.generarFactura(
+        tipo_factura="evento",
+        datos={
+            "nombre_evento": evento.nombre,
+            "id_evento": evento.id_evento,
+            "id_cliente": payload.id_cliente
+        }
     )
     
     # Seleccionar evento
@@ -557,18 +565,18 @@ def generar_reporte_ventas(
     """
     Generar y consultar reportes de ventas según diagrama CU-10.
     """
-    if payload.fechaInicio >= payload.fechaFin:
-        raise HTTPException(status_code=400, detail="La fecha de inicio debe ser anterior a la fecha de fin.")
+    if payload.fechaInicio and payload.fechaFin:
+        if payload.fechaInicio >= payload.fechaFin:
+            raise HTTPException(status_code=400, detail="La fecha de inicio debe ser anterior a la fecha de fin.")
 
     gerente = db.get(models.Gerente, payload.id_gerente)
     if not gerente:
         raise HTTPException(status_code=404, detail="Gerente no encontrado")
         
-    cine = db.get(models.Cine, payload.id_cine)
-    if not cine:
-        # Para evitar bloquear al usuario, si el cine no existe, lo creamos temporalmente o fallamos.
-        # En un sistema real debería existir. Lo dejamos fallar por integridad.
-        raise HTTPException(status_code=404, detail="Cine no encontrado")
+    if payload.id_cine is not None:
+        cine = db.get(models.Cine, payload.id_cine)
+        if not cine:
+            raise HTTPException(status_code=404, detail="Cine no encontrado")
 
     reporte = models.ReporteVentas(
         id_cine=payload.id_cine,
