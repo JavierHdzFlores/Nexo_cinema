@@ -114,7 +114,12 @@ export function LoyaltyPanel({
                     <motion.span
                       layoutId="monedero-op-pill"
                       className="absolute inset-0 rounded-md"
-                      style={{ background: op === 'canjear' ? '#f9a825' : 'rgba(255,255,255,0.15)' }}
+                      style={{
+                        background: op === 'acumular'
+                          ? 'linear-gradient(135deg, #f9a825, #ffca28)'
+                          : 'linear-gradient(135deg, #ff4e50, #f9a825)',
+                        boxShadow: `0 0 12px ${op === 'acumular' ? 'rgba(249,168,37,0.5)' : 'rgba(255,78,80,0.4)'}`
+                      }}
                       transition={{ type: 'spring', bounce: 0.2, duration: 0.25 }}
                     />
                   )}

@@ -128,6 +128,8 @@ class ArticuloDulceriaResponse(BaseModel):
     nombre: str
     precio: float
     tipo_articulo: str
+    stock_actual: int
+    stock_minimo: int
 
     class Config:
         from_attributes = True
@@ -139,6 +141,7 @@ class DetalleVentaRequest(BaseModel):
 class VentaDulceriaRequest(BaseModel):
     id_cliente: Optional[int] = None
     detalles: list[DetalleVentaRequest]
+    metodo_pago: str = "Efectivo"
     usar_puntos: bool = False
     puntos_a_usar: Optional[int] = 0
 

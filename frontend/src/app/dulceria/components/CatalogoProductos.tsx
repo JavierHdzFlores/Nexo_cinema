@@ -20,31 +20,35 @@ const API_URL = 'http://127.0.0.1:8000/dulceria';
 
 /* Mapeo de categorías del filtro UI → tipo_articulo del backend */
 const FILTRO_MAP: Record<string, string[]> = {
-  todos:     [],                        // sin filtro
+  todos:     [],
   combo:     ['combo'],
-  palomitas: ['producto_individual'],   // se filtra también por nombre abajo
+  palomitas: ['producto_individual'],
   bebidas:   ['producto_individual'],
   snacks:    ['producto_individual'],
+  dulces:    ['producto_individual'],
 };
 
 const KEYWORDS: Record<string, string[]> = {
   palomitas: ['palomitas', 'popcorn', 'caramelo', 'mantequilla'],
-  bebidas:   ['refresco', 'agua', 'jugo', 'bebida', 'soda'],
-  snacks:    ['nachos', 'hot dog', 'hotdog', 'dulce', 'galleta', 'snack'],
+  bebidas:   ['refresco', 'agua', 'jugo', 'bebida', 'soda', 'limonada', 'té'],
+  snacks:    ['nachos', 'hot dog', 'hotdog', 'pizza', 'alita', 'papas'],
+  dulces:    ['chocolate', 'gominola', 'gomita', 'dulce', 'galleta', 'chicle', 'caramelo', 'barra'],
 };
 
 interface CatalogoProductosProps {
   carrito: CartItem[];
   onAdd: (prod: ArticuloDulceriaResponse) => void;
   onSubtract: (id: number) => void;
-  filtroCategoria?: string;
+  filtroCategoria: string;
+  filtroBusqueda?: string;
 }
 
 export function CatalogoProductos({
   carrito,
   onAdd,
   onSubtract,
-  filtroCategoria = 'todos',
+  filtroCategoria,
+  filtroBusqueda = '',
 }: CatalogoProductosProps) {
   const [catalogo, setCatalogo] = useState<ArticuloDulceriaResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,22 +74,24 @@ export function CatalogoProductos({
   const getCantidad = (id: number) =>
     carrito.find(i => i.id_articulo === id)?.cantidad ?? 0;
 
-  /* ── Filtrado en memoria (0ms) ── */
-  const productosFiltrados: ArticuloDulceriaResponse[] = (() => {
-    if (filtroCategoria === 'todos') return catalogo;
+  /* ── Filtrado en memoria (0ms) — Mejora: Soporta Búsqueda ── */
+  const productosFiltrados = catalogo.filter(p => {
+    // 1. Filtro por categoría
+    let cumpleCategoria = filtroCategoria === 'todos';
+    if (!cumpleCategoria) {
+      if (filtroCategoria === 'combo') {
+        cumpleCategoria = p.tipo_articulo === 'combo';
+      } else {
+        const keywords = KEYWORDS[filtroCategoria] || [];
+        cumpleCategoria = keywords.some(key => p.nombre.toLowerCase().includes(key));
+      }
+    }
 
-    const tiposPermitidos = FILTRO_MAP[filtroCategoria] ?? [];
-    const keywords = KEYWORDS[filtroCategoria] ?? [];
+    // 2. Filtro por búsqueda
+    const cumpleBusqueda = p.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase());
 
-    return catalogo.filter(p => {
-      const tipoOk = tiposPermitidos.includes(p.tipo_articulo);
-      if (!tipoOk) return false;
-      if (filtroCategoria === 'combo') return true; // combos no necesitan keyword
-      // Para palomitas, bebidas, snacks filtramos por nombre
-      const nombre = p.nombre.toLowerCase();
-      return keywords.some(kw => nombre.includes(kw));
-    });
-  })();
+    return cumpleCategoria && cumpleBusqueda;
+  });
 
   /* ── Render ── */
   if (isLoading) {
@@ -121,7 +127,7 @@ export function CatalogoProductos({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
       {productosFiltrados.map(p => (
         <ProductCard
           key={p.id_articulo}
