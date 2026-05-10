@@ -183,3 +183,27 @@
     line-height: 1.5;
   }
 }
+
+/* Custom Webkit Scrollbar for Premium Feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.2); /* Amber-500 con opacidad */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.5);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.2) transparent;
+}

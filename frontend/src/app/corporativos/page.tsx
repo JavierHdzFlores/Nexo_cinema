@@ -1,28 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { Building2, RotateCcw, FileText } from "lucide-react";
 
-interface CotizacionFormData {
-  nombre_cliente: string;
-  id_sala: number;
-  fecha: string;
-  hora_inicio: string;
-  hora_fin: string;
-  asistentes: number;
-  paquete_dulceria: string;
-  costo_base_hora: number;
-}
-
-interface CotizacionResponse {
-  mensaje: string;
-  id_cotizacion: number;
-  valida_hasta: string;
-  desglose: {
-    costo_sala: number;
-    costo_dulceria: number;
-    gran_total: number;
-  };
-}
+import { CotizacionFormData, CotizacionResponse, SimulacionData } from "./types";
+import { CotizacionForm } from "./components/CotizacionForm";
+import { CotizacionSimulacion } from "./components/CotizacionSimulacion";
+import { CotizacionExito } from "./components/CotizacionExito";
+import { CotizacionError } from "./components/CotizacionError";
 
 export default function CorporativosPage() {
   const [formData, setFormData] = useState<CotizacionFormData>({
@@ -33,57 +19,104 @@ export default function CorporativosPage() {
     hora_fin: "",
     asistentes: 0,
     paquete_dulceria: "Ninguno",
-    costo_base_hora: 1500.0, // Default cost per hour
+    costo_base_hora: 1500,
   });
 
-  const [simulacion, setSimulacion] = useState<any>(null);
+  const [simulacion, setSimulacion] = useState<SimulacionData | null>(null);
   const [resultadoFinal, setResultadoFinal] = useState<CotizacionResponse | null>(null);
   const [error, setError] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: ["id_sala", "asistentes", "costo_base_hora"].includes(name) ? Number(value) : value,
-    }));
-  };
-
-  // Simulación en el frontend antes de guardar en la BD
+  // CU-03: Paso 4 - Validar datos de cliente e ingresos
   const simularCotizacion = () => {
     setError(null);
+    setResultadoFinal(null);
+
+    // 1. Validaciones Básicas de Captura
+    if (!formData.nombre_cliente.trim()) {
+      setError("Por favor ingresa el nombre de la empresa o cliente corporativo.");
+      return;
+    }
     if (!formData.fecha || !formData.hora_inicio || !formData.hora_fin) {
-      setError("Por favor completa las fechas y horarios.");
+      setError("Las fechas y horarios son obligatorios para generar una cotización.");
+      return;
+    }
+
+    // 2. Validaciones Temporales y de Negocio
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalizamos a media noche
+    
+    // Parseo cuidadoso asegurando la zona horaria local
+    const [year, month, day] = formData.fecha.split("-").map(Number);
+    const selectedDate = new Date(year, month - 1, day);
+    
+    if (selectedDate < today) {
+      setError("No se pueden agendar eventos corporativos en fechas pasadas.");
       return;
     }
 
     const start = new Date(`${formData.fecha}T${formData.hora_inicio}:00`);
     const end = new Date(`${formData.fecha}T${formData.hora_fin}:00`);
 
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      setError("El formato de fecha u hora es inválido.");
+      return;
+    }
+
     if (end <= start) {
-      setError("La hora de fin debe ser posterior a la de inicio.");
+      setError("Conflicto de agenda: La hora de fin debe ser estrictamente posterior a la de inicio.");
+      return;
+    }
+
+    // 3. Validación de Horario Operativo (Regla de negocio: Cine opera de 10:00 a 23:59)
+    const startHour = start.getHours() + start.getMinutes() / 60;
+    const endHour = end.getHours() + end.getMinutes() / 60;
+    
+    if (startHour < 10 || endHour > 23.98) {
+      setError("El horario solicitado está fuera de servicio. Las salas solo se rentan entre las 10:00 y las 23:59 hrs.");
       return;
     }
 
     const diffHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    
+    // 4. Validación de Duración (Mínimo 1 hora, máximo 14h continuas)
+    if (diffHours < 1) {
+      setError("La renta de la sala debe ser por un mínimo de 1.0 hora.");
+      return;
+    }
+
+    if (diffHours > 14) {
+      setError("Para eventos mayores a 14 horas continuas, comuníquese directamente con la gerencia comercial.");
+      return;
+    }
+
+    // CU-03: Paso 7 - Cálculos masivos (Con encapsulamiento lógico de precios base)
     const costo_sala = diffHours * formData.costo_base_hora;
 
     let precioPP = 0;
-    if (formData.paquete_dulceria.toLowerCase() === "basico") precioPP = 150;
-    else if (formData.paquete_dulceria.toLowerCase() === "premium") precioPP = 250;
-    else if (formData.paquete_dulceria.toLowerCase() === "vip") precioPP = 400;
+    switch (formData.paquete_dulceria) {
+      case "Basico": precioPP = 150; break;
+      case "Premium": precioPP = 250; break;
+      case "VIP": precioPP = 400; break;
+      default: precioPP = 0;
+    }
 
     const costo_dulceria = precioPP * formData.asistentes;
     const total = costo_sala + costo_dulceria;
+
+    const horasFormateadas = Number.isInteger(diffHours) 
+      ? `${diffHours} hora${diffHours === 1 ? '' : 's'}`
+      : `${diffHours.toFixed(1)} horas`;
 
     setSimulacion({
       costo_sala,
       costo_dulceria,
       total,
-      horas: diffHours,
+      horas: horasFormateadas,
     });
   };
 
+  // CU-03: Paso 8 y 9 - Generar cotización final y almacenar en el sistema
   const generarCotizacionFinal = async () => {
     setError(null);
     setLoading(true);
@@ -92,7 +125,7 @@ export default function CorporativosPage() {
     const end = new Date(`${formData.fecha}T${formData.hora_fin}:00`);
 
     const payload = {
-      nombre_cliente: formData.nombre_cliente,
+      nombre_cliente: formData.nombre_cliente.trim(),
       id_sala: formData.id_sala,
       fecha_hora_inicio: start.toISOString(),
       fecha_hora_fin: end.toISOString(),
@@ -111,23 +144,28 @@ export default function CorporativosPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Excepción E1: La sala no se encuentra disponible (Manejo de errores del backend)
         if (data.detail && data.detail.mensaje) {
-          setError(data.detail); // Object with message and suggestions
+          setError(data.detail);
         } else {
-          setError(data.detail || "Error al procesar la cotización.");
+          setError(data.detail || "Ocurrió un error inesperado al procesar la cotización.");
         }
+        setSimulacion(null);
       } else {
         setResultadoFinal(data);
       }
     } catch (err) {
-      setError("No se pudo conectar con el servidor.");
+      setError("Error de red: No se pudo establecer conexión con el servidor maestro de Nexo Cinema.");
+      setSimulacion(null);
     } finally {
       setLoading(false);
     }
   };
 
+  // Flujo alternativo S1: Cancelar operación
   const resetForm = () => {
-    if (confirm("¿Estás seguro de que deseas cancelar la operación?")) {
+    // S1.1 y S1.2: Confirmación y reinicio
+    if (confirm("¿Estás seguro de que deseas cancelar la operación? Se perderán los datos actuales.")) {
       setFormData({
         nombre_cliente: "",
         id_sala: 1,
@@ -145,286 +183,91 @@ export default function CorporativosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black/95 text-zinc-100 p-8 font-sans selection:bg-amber-500/30">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <main className="min-h-screen flex flex-col justify-center bg-[#030213] text-zinc-100 font-sans selection:bg-amber-500/30 overflow-x-hidden relative py-12">
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full" />
+      </div>
+
+      <div className="max-w-6xl w-full mx-auto px-6 relative z-10">
         
-        {/* Header */}
-        <header className="border-b border-amber-500/20 pb-6 flex items-center justify-between">
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b border-white/5 pb-8">
           <div>
-            <h1 className="font-bebas text-4xl text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500 tracking-wider">
-              NEXO CINEMA CORPORATIVO
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 shadow-[0_0_15px_rgba(249,168,37,0.1)]">
+                <Building2 className="w-5 h-5 text-amber-500" />
+              </div>
+              <span className="text-amber-500 text-xs font-bold uppercase tracking-[0.3em]">Coordinación de Eventos</span>
+            </div>
+            <h1 className="font-bebas text-5xl md:text-6xl text-white tracking-wider leading-none">
+              NEXO <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500">CORPORATIVO</span>
             </h1>
-            <p className="text-zinc-400 mt-2 text-sm tracking-wide">
-              Módulo de Coordinador de Eventos • Cotizador de Salas
+            <p className="text-zinc-500 mt-2 text-sm max-w-md">
+              Generador de presupuestos para renta de infraestructura y servicios integrales de catering masivo.
             </p>
           </div>
-          <div className="h-12 w-12 rounded-full border border-amber-500/30 flex items-center justify-center bg-amber-500/10">
-            <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
+          
+          <button 
+            onClick={resetForm}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-xs font-semibold uppercase tracking-widest text-zinc-400 hover:text-white"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Nueva Cotización
+          </button>
         </header>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Formulario */}
-          <div className="lg:col-span-7 bg-zinc-900/50 border border-zinc-800 rounded-2xl p-8 shadow-2xl backdrop-blur-sm relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/20 via-amber-400 to-amber-500/20"></div>
-            
-            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-              <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-              Datos del Evento
-            </h2>
-
-            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-400">Nombre del Cliente Corporativo</label>
-                <input
-                  type="text"
-                  name="nombre_cliente"
-                  value={formData.nombre_cliente}
-                  onChange={handleInputChange}
-                  className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all placeholder:text-zinc-600"
-                  placeholder="Ej. Empresa SA de CV"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-400">Sala a Rentar</label>
-                  <select
-                    name="id_sala"
-                    value={formData.id_sala}
-                    onChange={handleInputChange}
-                    className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all"
-                  >
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <option key={s} value={s}>Sala {s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-400">Costo Base / Hora ($)</label>
-                  <input
-                    type="number"
-                    name="costo_base_hora"
-                    value={formData.costo_base_hora}
-                    onChange={handleInputChange}
-                    className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-400">Fecha</label>
-                  <input
-                    type="date"
-                    name="fecha"
-                    value={formData.fecha}
-                    onChange={handleInputChange}
-                    className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 transition-all"
-                    style={{ colorScheme: "dark" }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-400">Inicio</label>
-                  <input
-                    type="time"
-                    name="hora_inicio"
-                    value={formData.hora_inicio}
-                    onChange={handleInputChange}
-                    className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 transition-all"
-                    style={{ colorScheme: "dark" }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-400">Fin</label>
-                  <input
-                    type="time"
-                    name="hora_fin"
-                    value={formData.hora_fin}
-                    onChange={handleInputChange}
-                    className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 transition-all"
-                    style={{ colorScheme: "dark" }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-400">Número de Asistentes</label>
-                  <input
-                    type="number"
-                    name="asistentes"
-                    value={formData.asistentes}
-                    onChange={handleInputChange}
-                    min="0"
-                    className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-400">Paquetes de Dulcería</label>
-                  <select
-                    name="paquete_dulceria"
-                    value={formData.paquete_dulceria}
-                    onChange={handleInputChange}
-                    className="w-full bg-black/50 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500/50 transition-all"
-                  >
-                    <option value="Ninguno">Ninguno</option>
-                    <option value="Basico">Básico ($150 p/p)</option>
-                    <option value="Premium">Premium ($250 p/p)</option>
-                    <option value="VIP">VIP ($400 p/p)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-4 border-t border-zinc-800/50 mt-6">
-                <button
-                  type="button"
-                  onClick={simularCotizacion}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3 px-4 rounded-lg transition-colors border border-zinc-700"
-                >
-                  Simular Cotización
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-6 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium py-3 rounded-lg transition-colors border border-red-500/20"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
+          {/* Columna Izquierda: Formulario Modular */}
+          <div className="lg:col-span-7">
+            <CotizacionForm 
+              formData={formData} 
+              setFormData={setFormData} 
+              onSimular={simularCotizacion}
+              onCancel={resetForm}
+            />
           </div>
 
-          {/* Panel Lateral: Resultados y Errores */}
-          <div className="lg:col-span-5 space-y-6">
-            
-            {/* Errores / Excepciones (E1) */}
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-red-200 shadow-xl animate-in fade-in slide-in-from-bottom-4">
-                <div className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                  <div>
-                    <h3 className="font-semibold text-red-400 text-lg mb-1">Conflicto de Disponibilidad</h3>
-                    <p className="text-sm opacity-90">{typeof error === "string" ? error : error.mensaje}</p>
-                    
-                    {error.salas_sugeridas && error.salas_sugeridas.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-red-500/20">
-                        <p className="text-xs font-medium text-red-300 uppercase tracking-wider mb-2">Salas Disponibles Sugeridas:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {error.salas_sugeridas.map((s: any) => (
-                            <button
-                              key={s.id_sala}
-                              onClick={() => {
-                                setFormData(prev => ({...prev, id_sala: s.id_sala}));
-                                setError(null);
-                              }}
-                              className="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 rounded border border-red-500/30 text-sm transition-colors"
-                            >
-                              {s.nombre || `Sala ${s.id_sala}`}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* Columna Derecha: Manejador de Estados (Simulación, Éxito, Errores) */}
+          <aside className="lg:col-span-5 space-y-6 sticky top-24 self-start">
+            <AnimatePresence mode="wait">
+              
+              {/* E1. Excepción: Sala no disponible / Error de Validación */}
+              {error && (
+                <CotizacionError key="error" error={error} setFormData={setFormData} setError={setError} />
+              )}
 
-            {/* Resultado Final (Éxito) */}
-            {resultadoFinal && !error && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-6 text-emerald-100 shadow-xl animate-in fade-in zoom-in-95">
-                <div className="flex items-center gap-3 mb-4 border-b border-emerald-500/20 pb-4">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-emerald-400 text-lg">Cotización Guardada</h3>
-                    <p className="text-xs opacity-80">ID: #{resultadoFinal.id_cotizacion.toString().padStart(5, '0')}</p>
-                  </div>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-emerald-200/70">Válida hasta:</span>
-                    <span className="font-medium">{new Date(resultadoFinal.valida_hasta).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-200/70">Costo Sala:</span>
-                    <span className="font-medium">${resultadoFinal.desglose.costo_sala.toLocaleString()} MXN</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-200/70">Costo Dulcería:</span>
-                    <span className="font-medium">${resultadoFinal.desglose.costo_dulceria.toLocaleString()} MXN</span>
-                  </div>
-                  <div className="flex justify-between pt-3 border-t border-emerald-500/20 mt-3">
-                    <span className="font-bold text-emerald-400">GRAN TOTAL:</span>
-                    <span className="font-bold text-emerald-400 text-xl">${resultadoFinal.desglose.gran_total.toLocaleString()} MXN</span>
-                  </div>
-                </div>
-              </div>
-            )}
+              {/* Éxito: Cotización guardada en sistema */}
+              {resultadoFinal && !error && (
+                <CotizacionExito key="exito" resultado={resultadoFinal} />
+              )}
 
-            {/* Panel de Simulación */}
-            {simulacion && !resultadoFinal && !error && (
-              <div className="bg-gradient-to-b from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl p-6 relative">
-                <h3 className="text-amber-500 font-bebas text-2xl tracking-wide mb-6">Presupuesto Simulado</h3>
-                
-                <div className="space-y-4 text-sm">
-                  <div className="flex justify-between items-center py-2 border-b border-zinc-800">
-                    <span className="text-zinc-400">Renta de Sala ({simulacion.horas} horas)</span>
-                    <span className="text-white font-medium">${simulacion.costo_sala.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-zinc-800">
-                    <span className="text-zinc-400">Dulcería ({formData.asistentes} pax - {formData.paquete_dulceria})</span>
-                    <span className="text-white font-medium">${simulacion.costo_dulceria.toLocaleString()}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center py-4 mt-4">
-                    <span className="text-lg font-bold text-amber-500">Costo Total Estimado</span>
-                    <span className="text-3xl font-bebas text-amber-500">${simulacion.total.toLocaleString()}</span>
-                  </div>
-                </div>
+              {/* Simulación: Vista previa antes de confirmar */}
+              {simulacion && !resultadoFinal && !error && (
+                <CotizacionSimulacion key="simulacion" simulacion={simulacion} formData={formData} onGenerar={generarCotizacionFinal} loading={loading} />
+              )}
 
-                <div className="mt-8">
-                  <button
-                    onClick={generarCotizacionFinal}
-                    disabled={loading}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 px-6 rounded-lg shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                        Generar Cotización y Guardar
-                      </>
-                    )}
-                  </button>
-                  <p className="text-xs text-center text-zinc-500 mt-4">
-                    Las cotizaciones no reservan la sala hasta que el cliente realice el pago.
+              {/* Estado Inicial: Esperando datos */}
+              {!simulacion && !resultadoFinal && !error && (
+                <motion.div 
+                  key="empty"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="h-full min-h-[400px] bg-white/[0.01] border border-white/5 border-dashed rounded-3xl flex flex-col items-center justify-center text-center p-8"
+                >
+                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
+                    <FileText className="w-8 h-8 text-zinc-700" />
+                  </div>
+                  <h3 className="text-white font-bold text-lg mb-2 tracking-tight">Panel de Presupuesto</h3>
+                  <p className="text-zinc-500 text-sm max-w-[240px] leading-relaxed">
+                    Complete la configuración del evento a la izquierda para generar una estimación de costos en tiempo real.
                   </p>
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
 
-            {!simulacion && !resultadoFinal && !error && (
-              <div className="bg-zinc-900/30 border border-zinc-800 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center h-full min-h-[300px]">
-                <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                </div>
-                <p className="text-zinc-500 max-w-xs">
-                  Llena los datos del evento y haz clic en "Simular Cotización" para ver un desglose de los costos.
-                </p>
-              </div>
-            )}
-
-          </div>
+            </AnimatePresence>
+          </aside>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
