@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Film, FileText, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<'factura' | 'ventas'>('factura');
@@ -29,7 +30,6 @@ export default function AdminPage() {
   // Estado para Reporte de Ventas (CU-10)
   const [consulta, setConsulta] = useState({
     id_gerente: '1',
-    id_cine: '1',
     fechaInicio: '',
     fechaFin: '',
     tipoGrafica: 'Barras'
@@ -49,7 +49,7 @@ export default function AdminPage() {
         id_gerente: parseInt(individual.id_gerente),
       };
 
-      const response = await fetch('http://localhost:8001/finanzas/facturas/individual', {
+      const response = await fetch('http://localhost:8000/finanzas/facturas/individual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -88,7 +88,7 @@ export default function AdminPage() {
         id_gerente: parseInt(evento.id_gerente),
       };
 
-      const response = await fetch('http://localhost:8001/finanzas/facturas/evento', {
+      const response = await fetch('http://localhost:8000/finanzas/facturas/evento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -129,13 +129,12 @@ export default function AdminPage() {
     try {
       const payload = {
         id_gerente: parseInt(consulta.id_gerente),
-        id_cine: parseInt(consulta.id_cine),
         fechaInicio: new Date(consulta.fechaInicio).toISOString(),
         fechaFin: new Date(consulta.fechaFin).toISOString(),
         tipoGrafica: consulta.tipoGrafica
       };
 
-      const response = await fetch('http://localhost:8001/finanzas/reportes/generar-reporte-ventas', {
+      const response = await fetch('http://localhost:8000/finanzas/reportes/generar-reporte-ventas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -416,7 +415,6 @@ export default function AdminPage() {
             </div>
             
             <form onSubmit={handleConsultarVentas} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Gerente *</label>
                   <input
@@ -428,24 +426,12 @@ export default function AdminPage() {
                     required
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID Cine *</label>
-                  <input
-                    type="number"
-                        min="1"
-                    value={consulta.id_cine}
-                    onChange={(e) => setConsulta({ ...consulta, id_cine: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#f9a825]/50 focus:ring-1 focus:ring-[#f9a825]/50 transition-all"
-                    required
-                  />
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">Fecha Inicio *</label>
                   <input
-                    type="datetime-local"
+                    type="date"
                     value={consulta.fechaInicio}
                     onChange={(e) => setConsulta({ ...consulta, fechaInicio: e.target.value })}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#f9a825]/50 focus:ring-1 focus:ring-[#f9a825]/50 transition-all [color-scheme:dark]"
@@ -455,7 +441,7 @@ export default function AdminPage() {
                 <div>
                   <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">Fecha Fin *</label>
                   <input
-                    type="datetime-local"
+                    type="date"
                     value={consulta.fechaFin}
                     onChange={(e) => setConsulta({ ...consulta, fechaFin: e.target.value })}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#f9a825]/50 focus:ring-1 focus:ring-[#f9a825]/50 transition-all [color-scheme:dark]"
@@ -511,6 +497,58 @@ export default function AdminPage() {
                     <p className="text-xs text-white/50 uppercase tracking-wider mb-1">Rentabilidad</p>
                     <p className="text-2xl font-semibold text-white">{datosReporte.rentabilidad || 0}%</p>
                   </div>
+                </div>
+
+                {/* CONTENEDOR DE GRÁFICA */}
+                <div className="mt-8 h-80 w-full bg-black/20 rounded-xl border border-white/5 p-4">
+                  {datosReporte.datos?.tipoGrafica === 'Barras' && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={datosReporte.datos?.detalle || []}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                        <XAxis dataKey="fecha" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)'}} />
+                        <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)'}} />
+                        <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#080b14', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }} />
+                        <Legend />
+                        <Bar dataKey="total" fill="#f9a825" name="Ventas ($)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                  {datosReporte.datos?.tipoGrafica === 'Lineas' && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={datosReporte.datos?.detalle || []}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                        <XAxis dataKey="fecha" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)'}} />
+                        <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)'}} />
+                        <Tooltip contentStyle={{ backgroundColor: '#080b14', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }} />
+                        <Legend />
+                        <Line type="monotone" dataKey="total" stroke="#f9a825" strokeWidth={3} name="Ventas ($)" dot={{ fill: '#ff4e50', strokeWidth: 2, r: 6 }} activeDot={{ r: 8 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                  {datosReporte.datos?.tipoGrafica === 'Pastel' && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Tooltip contentStyle={{ backgroundColor: '#080b14', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }} />
+                        <Legend />
+                        <Pie
+                          data={datosReporte.datos?.detalle || []}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={110}
+                          innerRadius={60}
+                          fill="#8884d8"
+                          dataKey="total"
+                          nameKey="fecha"
+                          label={({ fecha, percent }) => `${fecha} (${(percent * 100).toFixed(0)}%)`}
+                        >
+                          {(datosReporte.datos?.detalle || []).map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={['#f9a825', '#ff4e50', '#8884d8', '#82ca9d'][index % 4]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </motion.div>
             )}
