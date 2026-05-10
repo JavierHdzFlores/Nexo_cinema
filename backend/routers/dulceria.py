@@ -172,7 +172,7 @@ def vender_dulceria(venta_req: schemas.VentaDulceriaRequest, db: Session = Depen
 
     try:
         # ── 1. Iniciar Venta ──
-        nueva_venta = models.Venta(total=0.0)
+        nueva_venta = models.Venta(total=0.0, metodo_pago=venta_req.metodo_pago)
         nueva_venta.iniciarVenta() # Estado: "Iniciada"
         if venta_req.id_cliente:
             nueva_venta.id_cliente = venta_req.id_cliente
