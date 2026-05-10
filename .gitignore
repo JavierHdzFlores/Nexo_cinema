@@ -3,3 +3,4 @@ backend/nexo_cinema.db
 __pycache__/
 node_modules/
 .env
+*.backup
