@@ -90,3 +90,15 @@ def crear_cliente(cliente: schemas.ClienteCreate, db: Session=Depends(get_db)):
     db.add(nuevo_cliente)
     db.commit()
     db.refresh(nuevo_cliente)
+
+@router.put("/cliente/{id_cliente}/fiscales", status_code=status.HTTP_200_OK)
+def actualizar_datos_fiscales(id_cliente: int, datos: schemas.ClienteUpdateFiscales, db: Session = Depends(get_db)):
+    cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    
+    cliente.rfc = datos.rfc
+    cliente.codigo_postal = datos.codigo_postal
+    db.commit()
+    db.refresh(cliente)
+    return {"mensaje": "Datos fiscales actualizados", "rfc": cliente.rfc, "codigo_postal": cliente.codigo_postal}

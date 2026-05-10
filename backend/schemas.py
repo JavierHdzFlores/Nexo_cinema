@@ -143,8 +143,11 @@ class ClienteCreate(BaseModel):
     password: str
     rfc: Optional[str] = None
     codigo_postal: Optional[str] = None
-    
 
+class ClienteUpdateFiscales(BaseModel):
+    rfc: str
+    codigo_postal: str
+    
 # ==========================================
 # ESQUEMAS PARA DULCERÍA Y LEALTAD (CU-05, CU-06)
 # ==========================================

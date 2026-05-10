@@ -8,9 +8,20 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianG
 
 export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<'factura' | 'ventas'>('factura');
-  const [activeTab, setActiveTab] = useState<'individual' | 'evento'>('individual');
+  const [activeTab, setActiveTab] = useState<'individual' | 'evento' | 'datos_fiscales'>('individual');
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState('');
+
+  // Estado para actualización fiscal
+  const [showFiscalForm, setShowFiscalForm] = useState(false);
+  const [fiscalData, setFiscalData] = useState({ id_cliente: '', rfc: '', codigo_postal: '' });
+  
+  // Estado para mostrar factura generada
+  const [facturaGenerada, setFacturaGenerada] = useState<any>(null);
+
+  // Estado para la pestaña de Datos Fiscales
+  const [checkClienteId, setCheckClienteId] = useState('');
+  const [clienteFiscalInfo, setClienteFiscalInfo] = useState<any>(null);
 
   // Estado para Factura Individual
   const [individual, setIndividual] = useState({
@@ -57,6 +68,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         const data = await response.json();
+        setFacturaGenerada(data);
         setMensaje(`✓ Factura individual creada: #${data.id_factura}`);
         setIndividual({
           tipo_servicio: '',
@@ -66,7 +78,13 @@ export default function AdminPage() {
         });
       } else {
         const error = await response.json();
-        setMensaje(`✗ Error: ${error.detail || 'Error al crear la factura'}`);
+        if (error.detail && error.detail.includes("Datos fiscales")) {
+           setShowFiscalForm(true);
+           setFiscalData(prev => ({ ...prev, id_cliente: individual.id_cliente }));
+           setMensaje('Atención: El cliente no cuenta con datos fiscales completos.');
+        } else {
+           setMensaje(`✗ Error: ${error.detail || 'Error al crear la factura'}`);
+        }
       }
     } catch (error) {
       setMensaje('✗ Error de conexión con el servidor');
@@ -96,6 +114,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         const data = await response.json();
+        setFacturaGenerada(data);
         setMensaje(`✓ Factura de evento creada: #${data.id_factura}`);
         setEvento({
           id_evento: '',
@@ -104,11 +123,95 @@ export default function AdminPage() {
         });
       } else {
         const error = await response.json();
-        setMensaje(`✗ Error: ${error.detail || 'Error al crear la factura'}`);
+        if (error.detail && error.detail.includes("Datos fiscales")) {
+           setShowFiscalForm(true);
+           setFiscalData(prev => ({ ...prev, id_cliente: evento.id_cliente }));
+           setMensaje('Atención: El cliente no cuenta con datos fiscales completos.');
+        } else {
+           setMensaje(`✗ Error: ${error.detail || 'Error al crear la factura'}`);
+        }
       }
     } catch (error) {
       setMensaje('✗ Error de conexión con el servidor');
       console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateFiscales = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/usuarios/cliente/${fiscalData.id_cliente}/fiscales`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rfc: fiscalData.rfc,
+          codigo_postal: fiscalData.codigo_postal
+        })
+      });
+      if (res.ok) {
+         setMensaje('✓ Datos fiscales actualizados. Por favor, intenta generar la factura nuevamente.');
+         setShowFiscalForm(false);
+         setFiscalData({ id_cliente: '', rfc: '', codigo_postal: '' });
+      } else {
+         const err = await res.json();
+         setMensaje(`✗ Error al actualizar: ${err.detail}`);
+      }
+    } catch (e) {
+      setMensaje('✗ Error de conexión al actualizar datos fiscales.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckFiscales = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMensaje('');
+    setClienteFiscalInfo(null);
+    try {
+      const res = await fetch(`http://localhost:8000/finanzas/cliente/${checkClienteId}/validar-datos-fiscales`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+         const data = await res.json();
+         setClienteFiscalInfo(data);
+      } else {
+         const err = await res.json();
+         setMensaje(`✗ Error: ${err.detail}`);
+      }
+    } catch (e) {
+      setMensaje('✗ Error de conexión con el servidor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateFiscalesTab = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/usuarios/cliente/${checkClienteId}/fiscales`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rfc: fiscalData.rfc,
+          codigo_postal: fiscalData.codigo_postal
+        })
+      });
+      if (res.ok) {
+         setMensaje('✓ Datos fiscales actualizados correctamente.');
+         setClienteFiscalInfo(null);
+         setFiscalData({ id_cliente: '', rfc: '', codigo_postal: '' });
+         setCheckClienteId('');
+      } else {
+         const err = await res.json();
+         setMensaje(`✗ Error al actualizar: ${err.detail}`);
+      }
+    } catch (e) {
+      setMensaje('✗ Error de conexión al actualizar datos fiscales.');
     } finally {
       setLoading(false);
     }
@@ -252,10 +355,11 @@ export default function AdminPage() {
             style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
           >
             {/* Sub-tabs para tipos de factura */}
-            <div className="flex gap-4 mb-8 border-b border-white/10 pb-4">
+            <div className="flex gap-4 mb-8 border-b border-white/10 pb-4 overflow-x-auto">
               {[
                 { id: 'individual', label: 'Factura Individual' },
-                { id: 'evento', label: 'Factura de Evento' }
+                { id: 'evento', label: 'Factura de Evento' },
+                { id: 'datos_fiscales', label: 'Agregar Datos Fiscales' }
               ].map(tab => {
                 const isActive = activeTab === tab.id;
                 return (
@@ -391,13 +495,226 @@ export default function AdminPage() {
 
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || showFiscalForm}
                     className="w-full py-3.5 px-6 rounded-xl font-medium tracking-wide text-[#080b14] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                     style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)' }}
                   >
                     {loading ? 'Procesando...' : 'Emitir Factura de Evento'}
                   </button>
                 </form>
+              </motion.div>
+            )}
+
+            {/* Formulario Verificación de Datos Fiscales */}
+            {activeTab === 'datos_fiscales' && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                <h2 className="text-xl font-medium text-white mb-2">Verificar / Agregar Datos Fiscales</h2>
+                <p className="text-sm text-white/40 mb-8">Verifica si un cliente tiene sus datos fiscales completos antes de facturar.</p>
+
+                <form onSubmit={handleCheckFiscales} className="flex gap-4 items-end mb-8">
+                  <div className="flex-1">
+                    <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-2 block">ID del Cliente *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={checkClienteId}
+                      onChange={(e) => setCheckClienteId(e.target.value)}
+                      placeholder="Ej. 1"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50]/50 focus:ring-1 focus:ring-[#ff4e50]/50 transition-all"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-3 rounded-xl font-medium tracking-wide text-white bg-white/10 hover:bg-white/20 border border-white/10 transition-all disabled:opacity-50"
+                  >
+                    {loading ? 'Buscando...' : 'Verificar'}
+                  </button>
+                </form>
+
+                {clienteFiscalInfo && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 p-6 rounded-xl border border-white/10 bg-white/5">
+                    <h3 className="text-lg font-medium text-white mb-2">Cliente: {clienteFiscalInfo.cliente.nombre}</h3>
+                    
+                    {clienteFiscalInfo.validacion.valido ? (
+                      <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400">
+                        <p className="font-medium flex items-center gap-2">✓ El cliente ya cuenta con datos fiscales completos.</p>
+                        <ul className="mt-2 text-sm text-green-400/80">
+                          <li>RFC: {clienteFiscalInfo.cliente.rfc}</li>
+                          <li>C.P.: {clienteFiscalInfo.cliente.codigo_postal}</li>
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-lg bg-[#ff4e50]/10 border border-[#ff4e50]/20">
+                        <p className="font-medium text-[#ff4e50] mb-4">El cliente NO tiene datos fiscales completos. Faltan los siguientes datos:</p>
+                        
+                        <form onSubmit={handleUpdateFiscalesTab} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-1 block">RFC *</label>
+                              <input
+                                type="text"
+                                value={fiscalData.rfc || clienteFiscalInfo.cliente.rfc || ''}
+                                onChange={(e) => setFiscalData({ ...fiscalData, rfc: e.target.value })}
+                                placeholder="Ej: JUPR900101XYZ"
+                                className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50] transition-all"
+                                required
+                                minLength={13}
+                                maxLength={13}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-1 block">Código Postal *</label>
+                              <input
+                                type="text"
+                                value={fiscalData.codigo_postal || clienteFiscalInfo.cliente.codigo_postal || ''}
+                                onChange={(e) => setFiscalData({ ...fiscalData, codigo_postal: e.target.value })}
+                                placeholder="Ej: 12345"
+                                className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50] transition-all"
+                                required
+                                minLength={5}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={loading}
+                            className="mt-4 px-6 py-2.5 rounded-lg font-medium text-[#080b14] w-full disabled:opacity-50"
+                            style={{ background: 'linear-gradient(135deg, #ff4e50, #f9a825)' }}
+                          >
+                            {loading ? 'Guardando...' : 'Guardar Datos Fiscales'}
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Formulario de Datos Fiscales */}
+            {showFiscalForm && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 p-6 rounded-xl border border-[#ff4e50]/50 bg-[#ff4e50]/10">
+                <h3 className="text-lg font-medium text-[#ff4e50] mb-2">Completar Datos Fiscales</h3>
+                <p className="text-sm text-white/70 mb-4">El cliente {fiscalData.id_cliente} necesita actualizar su información para poder facturar.</p>
+                <form onSubmit={handleUpdateFiscales} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-1 block">RFC *</label>
+                      <input
+                        type="text"
+                        value={fiscalData.rfc}
+                        onChange={(e) => setFiscalData({ ...fiscalData, rfc: e.target.value })}
+                        placeholder="Ej: JUPR900101XYZ"
+                        className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50] transition-all"
+                        required
+                        minLength={13}
+                        maxLength={13}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium uppercase tracking-widest text-white/50 mb-1 block">Código Postal *</label>
+                      <input
+                        type="text"
+                        value={fiscalData.codigo_postal}
+                        onChange={(e) => setFiscalData({ ...fiscalData, codigo_postal: e.target.value })}
+                        placeholder="Ej: 12345"
+                        className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#ff4e50] transition-all"
+                        required
+                        minLength={5}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowFiscalForm(false)}
+                      className="px-6 py-2.5 rounded-lg font-medium text-white/70 hover:text-white bg-white/5 hover:bg-white/10 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-6 py-2.5 rounded-lg font-medium text-white bg-[#ff4e50] hover:bg-[#ff4e50]/80 transition-all disabled:opacity-50"
+                    >
+                      {loading ? 'Guardando...' : 'Guardar y Continuar'}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+
+            {/* Vista de Factura Generada */}
+            {facturaGenerada && !showFiscalForm && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-8 p-6 rounded-2xl border border-white/10 bg-white/5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1" style={{ background: 'linear-gradient(90deg, #ff4e50, #f9a825)' }}></div>
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white tracking-wide" style={{ fontFamily: "'Bebas Neue', cursive" }}>FACTURA #{facturaGenerada.id_factura}</h3>
+                    <p className="text-sm text-white/50">{new Date(facturaGenerada.fecha).toLocaleString()}</p>
+                  </div>
+                  <div className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-wider">
+                    {facturaGenerada.estado}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                  <div>
+                    <p className="text-white/40 uppercase text-xs mb-1">Tipo</p>
+                    <p className="text-white font-medium capitalize">{facturaGenerada.tipo_factura.replace('_', ' ')}</p>
+                  </div>
+                  {facturaGenerada.cliente && (
+                    <div>
+                      <p className="text-white/40 uppercase text-xs mb-1">Cliente</p>
+                      <p className="text-white font-medium">{facturaGenerada.cliente.nombre} (ID: {facturaGenerada.cliente.id})</p>
+                    </div>
+                  )}
+                  {facturaGenerada.tipo_servicio && (
+                    <div className="col-span-2">
+                      <p className="text-white/40 uppercase text-xs mb-1">Concepto / Servicio</p>
+                      <p className="text-white font-medium">{facturaGenerada.tipo_servicio}</p>
+                    </div>
+                  )}
+                  {facturaGenerada.evento && (
+                    <div className="col-span-2">
+                      <p className="text-white/40 uppercase text-xs mb-1">Evento</p>
+                      <p className="text-white font-medium">{facturaGenerada.nombre_evento} (ID: {facturaGenerada.evento.id})</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 bg-black/40 rounded-xl border border-white/5 flex justify-between items-center mb-6">
+                  <span className="text-white/70 uppercase text-xs font-bold tracking-widest">Total a Pagar</span>
+                  <span className="text-3xl font-bold text-[#f9a825]">${facturaGenerada.total.toFixed(2)}</span>
+                </div>
+
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => {
+                      const content = `==================================================\nFACTURA #${facturaGenerada.id_factura}\n==================================================\nFecha: ${new Date(facturaGenerada.fecha).toLocaleString()}\nEstado: ${facturaGenerada.estado.toUpperCase()}\nTotal: $${facturaGenerada.total.toFixed(2)}\n==================================================\n${facturaGenerada.tipo_factura === 'factura_individual' ? 'TIPO: Factura Individual\nServicio: ' + facturaGenerada.tipo_servicio : 'TIPO: Factura de Evento\nEvento: ' + facturaGenerada.nombre_evento}\n${facturaGenerada.cliente ? 'Cliente: ' + facturaGenerada.cliente.nombre : ''}\n==================================================`;
+                      const blob = new Blob([content], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `factura_${facturaGenerada.id_factura}.txt`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-colors flex justify-center items-center gap-2"
+                  >
+                    <FileText size={18} /> Descargar PDF (TXT)
+                  </button>
+                  <button 
+                    onClick={() => setFacturaGenerada(null)}
+                    className="px-6 py-3 border border-white/10 hover:bg-white/5 text-white/70 rounded-xl font-medium transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </motion.div>
             )}
           </div>
