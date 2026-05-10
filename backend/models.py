@@ -233,6 +233,30 @@ class Venta(Base):
         db.add(self)
         db.flush()
 
+    # Métodos de Estado (Máquina de Estados)
+    def iniciarVenta(self):
+        self.estado = "Iniciada"
+        
+    def agregarDetalle(self, articulo, cantidad: int):
+        detalle = DetalleVenta(
+            id_venta=self.id_venta,
+            id_articulo=articulo.id_articulo,
+            cantidad=cantidad,
+            articulo=articulo
+        )
+        detalle.calcularSubtotal()
+        return detalle
+
+    def calcularTotal(self, detalles: list) -> float:
+        self.total = sum(detalle.subtotal for detalle in detalles)
+        return self.total
+        
+    def procesarPago(self):
+        self.estado = "PendienteDePago"
+        
+    def registrarVenta(self):
+        self.estado = "Finalizada"
+
 # ==========================================
 # NUEVAS TABLAS: ASIENTO Y BOLETO (CU-04)
 # ==========================================
@@ -444,6 +468,15 @@ class ArticuloDulceria(Base):
     precio = Column(Float, nullable=False)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, default=10) # Para las alertas de inventario
+    tipo_articulo = Column(String(50)) # Discriminador para herencia
+
+    __mapper_args__ = {
+        "polymorphic_identity": "articulo",
+        "polymorphic_on": tipo_articulo,
+    }
+    
+    def obtenerPrecio(self) -> float:
+        return self.precio
 
 
 class RegistroLimpieza(Base):
@@ -490,15 +523,7 @@ class AlertaStock(Base):
     activa = Column(Boolean, default=True)
 
     insumo = relationship("Insumo", backref="alertas")
-    tipo_articulo = Column(String(50)) # Discriminador para herencia
 
-    __mapper_args__ = {
-        "polymorphic_identity": "articulo",
-        "polymorphic_on": tipo_articulo,
-    }
-    
-    def obtenerPrecio(self) -> float:
-        return self.precio
 
 class ProductoIndividual(ArticuloDulceria):
     __tablename__ = "productos_individuales"
@@ -637,27 +662,27 @@ class Monedero(Base):
     __tablename__ = "monederos"
     id_monedero = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), unique=True, nullable=False)
-    saldoPuntos = Column(Integer, default=0, nullable=False)
-    fechaVencimiento = Column(DateTime)
+    saldo_puntos = Column(Integer, default=0, nullable=False)
+    fecha_vencimiento = Column(DateTime)
     estado = Column(String(50), default="Operativa") # "Operativa", "Vencida", "Bloqueada"
 
     # El Cliente "posee" 1 Monedero (backref crea la relación bidireccional sin tocar la clase Cliente)
     cliente = relationship("Cliente", backref="monedero_obj")
 
     def consultarSaldo(self) -> int:
-        return self.saldoPuntos
+        return self.saldo_puntos
 
     def validarSaldoSuficiente(self, monto: int) -> bool:
-        return self.saldoPuntos >= monto
+        return self.saldo_puntos >= monto
 
     def actualizarSaldo(self, monto: int, operacion: str) -> None:
         if operacion == "Canje":
             if self.validarSaldoSuficiente(monto):
-                self.saldoPuntos -= monto
+                self.saldo_puntos -= monto
             else:
                 raise ValueError("Saldo de puntos insuficiente")
         elif operacion == "Acumular":
-            self.saldoPuntos += monto
+            self.saldo_puntos += monto
 
     # Transiciones de Estado (Diagrama 7 Máquina de Estados CU-06)
     def expirarPlazo(self) -> None:
@@ -668,11 +693,11 @@ class Monedero(Base):
 
     def desbloquearCuenta(self) -> None:
         self.estado = "Operativa"
-        self.saldoPuntos = 0
+        self.saldo_puntos = 0
 
     def reiniciarPuntos(self) -> None:
         self.estado = "Operativa"
-        self.saldoPuntos = 0
+        self.saldo_puntos = 0
 
 class TransaccionPuntos(Base):
     __tablename__ = "transacciones_puntos"
