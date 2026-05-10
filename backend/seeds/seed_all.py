@@ -228,20 +228,31 @@ def _seed_dulceria(db):
 def _seed_clientes(db):
     print("👤  Creando clientes de prueba...")
     clientes_data = [
-        {"nombre": "Juan Pérez",   "correo": "juan@nexo.com",   "puntos": 500},
-        {"nombre": "María López",  "correo": "maria@nexo.com",  "puntos": 80},
-        {"nombre": "Carlos Ruiz",  "correo": "carlos@nexo.com", "puntos": 0},
+        {"id": 1, "nombre": "Juan Pérez",   "correo": "juan@nexo.com",   "puntos": 500, "rfc": "PERJ800101XYZ"},
+        {"id": 2, "nombre": "María López",  "correo": "maria@nexo.com",  "puntos": 80,  "rfc": "LOMM850202ABC"},
+        {"id": 3, "nombre": "Carlos Ruiz",  "correo": "carlos@nexo.com", "puntos": 0,   "rfc": "RUCC900303QWE"},
     ]
     for c in clientes_data:
         cliente = models.Cliente(
+            id_usuario=c["id"],
             nombre=c["nombre"],
             correo=c["correo"],
+            rfc=c["rfc"],
             password="nexo1234",
             puntos_monedero=c["puntos"]
         )
         db.add(cliente)
+        
+        # Crear la cuenta de lealtad (CU-06)
+        monedero = models.Monedero(
+            id_cliente=c["id"],
+            saldo_puntos=c["puntos"],
+            estado="Operativa"
+        )
+        db.add(monedero)
+        
     db.commit()
-    print(f"   → {len(clientes_data)} clientes con monedero\n")
+    print(f"   → {len(clientes_data)} clientes y sus monederos generados (IDs: 1, 2, 3)\n")
 
 
 if __name__ == "__main__":

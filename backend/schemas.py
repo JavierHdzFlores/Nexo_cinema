@@ -169,6 +169,7 @@ class DetalleVentaRequest(BaseModel):
 
 class VentaDulceriaRequest(BaseModel):
     id_cliente: Optional[int] = None
+    id_evento: Optional[int] = None  # Permitir asociar la venta de dulcería a un evento específico
     detalles: list[DetalleVentaRequest]
     metodo_pago: str = "Efectivo"
     usar_puntos: bool = False

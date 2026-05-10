@@ -16,6 +16,57 @@ class Sala(Base):
     # NUEVO: Efecto espejo hacia Evento
     eventos = relationship("Evento", back_populates="sala")
 
+    # ==========================================
+    # RESPONSABILIDADES (Diagrama CU-02)
+    # ==========================================
+    def verificarBoletosVendidos(self, db, fecha_inicio, fecha_fin) -> bool:
+        """
+        Responsabilidad: Validar si hay boletos vendidos en un rango de tiempo
+        Retorna True si existen boletos vendidos, False si está libre.
+        """
+        from sqlalchemy import inspect
+        if not db:
+            return False
+            
+        eventos_sala = db.query(Evento).filter(
+            Evento.id_sala == self.id_sala,
+            Evento.fecha_hora_inicio < fecha_fin,
+            Evento.fecha_hora_fin > fecha_inicio
+        ).all()
+        
+        for evento in eventos_sala:
+            ventas = db.query(Venta).filter(Venta.id_evento == evento.id_evento).all()
+            if len(ventas) > 0:
+                return True
+        return False
+
+    def cambiarEstado(self, nuevoEstado: str) -> None:
+        """Responsabilidad: Mantener estado de disponibilidad"""
+        self.estado = nuevoEstado
+
+    def bloquearParaTaquilla(self) -> None:
+        """Bloquea la sala estableciendo estado a Evento Privado"""
+        self.cambiarEstado("Evento Privado")
+
+    # ==========================================
+    # RESPONSABILIDADES (Diagrama CU-01)
+    # ==========================================
+    def validarEmpalmes(self, db, fecha_inicio, fecha_fin) -> bool:
+        """
+        Responsabilidad CU-01: Validar empalmes de horario.
+        Retorna True si hay un evento empalmado.
+        """
+        if not db:
+            return False
+            
+        empalmes = db.query(Evento).filter(
+            Evento.id_sala == self.id_sala,
+            Evento.fecha_hora_inicio < fecha_fin,
+            Evento.fecha_hora_fin > fecha_inicio
+        ).all()
+        return len(empalmes) > 0
+
+
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -88,6 +139,13 @@ class Gerente(Empleado):
     reportes_generados = relationship("ReporteVentas", back_populates="gerente")
 
     __mapper_args__ = {"polymorphic_identity": "gerente"}
+    
+class VendedorDulceria(Empleado):
+    __tablename__ = "vendedores_dulceria"
+    id_vendedor = Column(Integer, ForeignKey("empleados.id_empleado"), primary_key=True)
+    caja_asignada = Column(Integer, nullable=True)
+
+    __mapper_args__ = {"polymorphic_identity": "vendedor_dulceria"}
     
     def consultarReportes(self) -> list:
         return self.reportes_generados
@@ -207,6 +265,29 @@ class ProyeccionPublica(Evento):
 
     __mapper_args__ = {"polymorphic_identity": "proyeccion_publica"}
 
+    # ==========================================
+    # RESPONSABILIDADES (Diagramas CU-01)
+    # ==========================================
+    @property
+    def tiempo_limpieza(self) -> int:
+        return 30
+
+    def calcularHoraFin(self) -> datetime.datetime:
+        """Calcula la hora de fin sumando duración de película + limpieza"""
+        if not self.pelicula_obj or not self.fecha_hora_inicio:
+            return None
+        return self.fecha_hora_inicio + datetime.timedelta(minutes=self.pelicula_obj.duracion_minutos + self.tiempo_limpieza)
+
+    def registrarFuncion(self, db) -> None:
+        """Responsabilidad: Habilitar venta de boletos (Persistir en BD)"""
+        db.add(self)
+        db.commit()
+        db.refresh(self)
+
+    def mostrarResumen(self) -> str:
+        """Muestra el resumen de la función"""
+        return f"Función de {self.pelicula_obj.titulo} el {self.fecha_hora_inicio} en Sala {self.id_sala}"
+
 class EventoPrivado(Evento):
     __tablename__ = "eventos_privados"
     id_evento_privado = Column(Integer, ForeignKey("eventos.id_evento"), primary_key=True)
@@ -221,6 +302,32 @@ class EventoPrivado(Evento):
 
     __mapper_args__ = {"polymorphic_identity": "evento_privado"}
 
+    # ==========================================
+    # RESPONSABILIDADES (Diagrama CU-02)
+    # ==========================================
+    def agregarServicio(self, servicio: str) -> None:
+        """Agrega un servicio adicional marcando el flag correspondiente"""
+        if servicio == "microfonos":
+            self.req_microfonos = True
+        elif servicio == "catering":
+            self.req_catering = True
+        elif servicio == "iluminacion":
+            self.req_iluminacion = True
+            
+    def calcularCostoTotal(self) -> float:
+        """Calcula el costo total (renta base + servicios adicionales)"""
+        total = self.costo_renta
+        if self.req_microfonos:
+            total += 500
+        if self.req_catering:
+            total += 3500
+        if self.req_iluminacion:
+            total += 1200
+        return total
+        
+    def generarOrdenCobro(self) -> None:
+        """Genera el proceso de cobro. Implementado en el router y pdf_utils"""
+        pass
 
 # ==========================================
 # ACTUALIZACIÓN EN LA TABLA VENTA

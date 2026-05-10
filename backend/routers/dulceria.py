@@ -176,6 +176,9 @@ def vender_dulceria(venta_req: schemas.VentaDulceriaRequest, db: Session = Depen
         nueva_venta.iniciarVenta() # Estado: "Iniciada"
         if venta_req.id_cliente:
             nueva_venta.id_cliente = venta_req.id_cliente
+        if venta_req.id_evento:
+            nueva_venta.id_evento = venta_req.id_evento
+            
         db.add(nueva_venta)
         db.flush() # ATOMICIDAD: Flush en lugar de commit para no cerrar la transacción
 

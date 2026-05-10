@@ -101,7 +101,7 @@ export function PaymentModal({
 
               {/* Selector de Método de Pago */}
               <div className="flex bg-white/5 rounded-xl p-1">
-                {['Efectivo', 'Tarjeta'].map((m) => (
+                {['Efectivo', 'Tarjeta', 'Transferencia'].map((m) => (
                   <button
                     key={m}
                     onClick={() => setMetodoPago(m)}

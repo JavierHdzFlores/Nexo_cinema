@@ -45,14 +45,20 @@ export function Navbar() {
 
         {/* Desktop Nav Links */}
         <div className="hidden md:flex items-center gap-8">
-          {["Inicio", "Cartelera", "Próximamente", "Cines", "Ofertas"].map((item, i) => (
+          {[
+            { name: "Inicio", href: "/" },
+            { name: "Cartelera", href: "/cartelera" },
+            { name: "Renta de Salas", href: "/renta" },
+            { name: "Próximamente", href: "#" },
+            { name: "Ofertas", href: "#" },
+          ].map((item, i) => (
             <Link
               key={i}
-              href="#" // TODO: Actualizar con las rutas reales, ej: href={`/${item.toLowerCase()}`}
+              href={item.href}
               className="text-sm transition-colors duration-200 relative group"
               style={{ color: i === 0 ? "#f9a825" : "rgba(255,255,255,0.7)", fontFamily: "'Inter', sans-serif" }}
             >
-              {item}
+              {item.name}
               {i === 0 && (
                 <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full" style={{ background: "#f9a825" }} />
               )}
@@ -100,9 +106,15 @@ export function Navbar() {
             style={{ background: "rgba(8,11,20,0.98)", backdropFilter: "blur(20px)" }}
           >
             <div className="px-6 py-4 flex flex-col gap-4">
-              {["Inicio", "Cartelera", "Próximamente", "Cines", "Ofertas"].map((item, i) => (
-                <Link key={i} href="#" className="text-white/80 text-sm py-2 border-b border-white/5" style={{ fontFamily: "'Inter', sans-serif" }}>
-                  {item}
+              {[
+                { name: "Inicio", href: "/" },
+                { name: "Cartelera", href: "/cartelera" },
+                { name: "Renta de Salas", href: "/renta" },
+                { name: "Próximamente", href: "#" },
+                { name: "Ofertas", href: "#" },
+              ].map((item, i) => (
+                <Link key={i} href={item.href} className="text-white/80 text-sm py-2 border-b border-white/5" style={{ fontFamily: "'Inter', sans-serif" }}>
+                  {item.name}
                 </Link>
               ))}
               <button className="flex items-center gap-2 text-white/80 text-sm py-2" style={{ fontFamily: "'Inter', sans-serif" }}>

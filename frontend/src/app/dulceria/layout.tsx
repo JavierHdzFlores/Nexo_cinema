@@ -174,6 +174,18 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
   /* ── Máquina de estados (Diagrama 6 CU-05) ── */
   const [estadoVenta, setEstadoVenta] = useState<EstadoVenta>('Iniciada');
   const [respuestaVenta, setRespuestaVenta] = useState<VentaDulceriaResponse | null>(null);
+  const [idEvento, setIdEvento] = useState<number | ''>('');
+
+  // ── Auto-fill del ID de Evento desde la URL (Mejora UX) ──
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const ev = params.get('evento');
+      if (ev && !isNaN(Number(ev))) {
+        setIdEvento(Number(ev));
+      }
+    }
+  }, []);
 
   const subtotal = carrito.reduce((acc, i) => acc + i.subtotal, 0);
   const descuentoPuntos = (operacion === 'canjear' && idCliente)
@@ -196,6 +208,7 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
 
     const body: VentaDulceriaRequest = {
       id_cliente: idCliente ?? undefined,
+      id_evento: idEvento !== '' ? Number(idEvento) : undefined,
       metodo_pago: metodoPago,
       usar_puntos: operacion === 'canjear',
       puntos_a_usar: descuentoPuntos,
@@ -239,6 +252,7 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
     setOperacion('acumular');
     setEstadoVenta('Iniciada');
     setRespuestaVenta(null);
+    setIdEvento('');
   };
 
   /* ─────────────────────────────────────────────────────────── RENDER ─── */
@@ -330,6 +344,8 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
             total={subtotal}
             descuentoPuntos={descuentoPuntos}
             granTotal={granTotal}
+            idEvento={idEvento}
+            setIdEvento={setIdEvento}
             onClearCart={limpiarCarrito}
             onCheckout={handleSolicitarCobro}
           />
