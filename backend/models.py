@@ -201,7 +201,7 @@ class Evento(Base):
     id_evento = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_sala = Column(Integer, ForeignKey("salas.id_sala"))
     nombre = Column(String(150), nullable=False)
-    fecha_hora_inicio = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    fecha_hora_inicio = Column(DateTime, default=datetime.datetime.now, nullable=False)
     fecha_hora_fin = Column(DateTime)
     tipo_evento = Column(String(50)) 
 
@@ -339,7 +339,7 @@ class Venta(Base):
     id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), nullable=True)
     id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=True)
     id_empleado = Column(Integer, ForeignKey("empleados.id_empleado"), nullable=True) # NUEVO
-    fecha_venta = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    fecha_venta = Column(DateTime, default=datetime.datetime.now, nullable=False)
     total = Column(Float, nullable=False)
     metodo_pago = Column(String(50), nullable=False) # NUEVO: Efectivo, Tarjeta, etc.
     estado = Column(String(20), default="Completada") # NUEVO
@@ -435,7 +435,7 @@ class Factura(Base):
     __tablename__ = "facturas"
     id_factura = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_gerente = Column(Integer, ForeignKey("gerentes.id_gerente"), nullable=False)
-    fecha = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    fecha = Column(DateTime, default=datetime.datetime.now, nullable=False)
     total = Column(Float, default=0.0, nullable=False)
     estado = Column(String(50), default="pendiente", nullable=False)
     tipo_factura = Column(String(50), nullable=False) 
@@ -535,7 +535,7 @@ class FacturaPDF(Base):
     id_pdf = Column(Integer, primary_key=True, index=True, autoincrement=True)
     factura_id = Column(Integer, ForeignKey("facturas.id_factura"), unique=True, nullable=False)
     archivo = Column(String(255), nullable=False)
-    fecha_generacion = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    fecha_generacion = Column(DateTime, default=datetime.datetime.now, nullable=False)
     
     factura = relationship("Factura", back_populates="factura_pdf")
     
@@ -575,7 +575,7 @@ class FacturaPDF(Base):
         contenido = getattr(self, "_contenido_pdf", None) or self.crearPDF()
         archivo_path.write_text(contenido, encoding="utf-8")
         self.archivo = str(archivo_path)
-        self.fecha_generacion = datetime.datetime.utcnow()
+        self.fecha_generacion = datetime.datetime.now()
         return self.archivo
 
 
@@ -620,7 +620,7 @@ class MovimientoInventario(Base):
     id_insumo = Column(Integer, ForeignKey("insumos.id_insumo"))
     tipo = Column(String(20))  # entrada / salida
     cantidad = Column(Integer, nullable=False)
-    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha = Column(DateTime, default=datetime.datetime.now)
 
     insumo = relationship("Insumo", backref="movimientos")
 
@@ -630,7 +630,7 @@ class AlertaStock(Base):
     id_alerta = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_insumo = Column(Integer, ForeignKey("insumos.id_insumo"))
     mensaje = Column(String(255))
-    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha = Column(DateTime, default=datetime.datetime.now)
     activa = Column(Boolean, default=True)
 
     insumo = relationship("Insumo", backref="alertas")
@@ -732,7 +732,7 @@ class LogMovimiento(Base):
     id_log = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_insumo = Column(Integer, ForeignKey("insumos_dulceria.id_insumo"), nullable=False)
     accion = Column(String(200), nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.datetime.now)
 
     insumo = relationship("InsumoDulceria")
     
@@ -745,7 +745,7 @@ class Ticket(Base):
     id_ticket = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_venta = Column(Integer, ForeignKey("ventas.id_venta"), unique=True, nullable=False)
     folio_fiscal = Column(String(100), unique=True, nullable=False)
-    fecha_emision = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_emision = Column(DateTime, default=datetime.datetime.now)
 
     # NUEVO: Detalle de Monedero en Ticket (Diagrama 6 Secuencia CU-06)
     saldo_anterior = Column(Integer, nullable=True)
@@ -814,7 +814,7 @@ class TransaccionPuntos(Base):
     __tablename__ = "transacciones_puntos"
     idTransaccion = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_monedero = Column(Integer, ForeignKey("monederos.id_monedero"), nullable=False)
-    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha = Column(DateTime, default=datetime.datetime.now)
     monto = Column(Integer, nullable=False)
     tipo = Column(String(50), nullable=False)
 
@@ -837,7 +837,7 @@ class LogAuditoria(Base):
     __tablename__ = "log_auditoria_monedero"
     id_log = Column(Integer, primary_key=True, index=True, autoincrement=True)
     detalle = Column(String(255), nullable=False)
-    fecha = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha = Column(DateTime, default=datetime.datetime.now)
 
     def escribirEntrada(self, db, detalle_txt: str) -> None:
         self.detalle = detalle_txt
@@ -937,7 +937,7 @@ class Cotizacion(Base):
     costo_dulceria = Column(Float, nullable=False)
     total = Column(Float, nullable=False)
     
-    fecha_emision = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_emision = Column(DateTime, default=datetime.datetime.now)
     fecha_vigencia = Column(DateTime, nullable=False)
     estado = Column(String(20), default="Pendiente") # Pendiente, Pagada, Vencida
 
@@ -951,7 +951,7 @@ class Cotizacion(Base):
         Si ya expiró, transiciona el estado a 'Vencida' (Diagrama 6: vigencia_expirada).
         Retorna True si la cotización aún es válida.
         """
-        if datetime.datetime.utcnow() > self.fecha_vigencia:
+        if datetime.datetime.now() > self.fecha_vigencia:
             self.estado = "Vencida"
             return False
         return True

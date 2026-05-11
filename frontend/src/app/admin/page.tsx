@@ -60,7 +60,7 @@ export default function AdminPage() {
         id_gerente: parseInt(individual.id_gerente),
       };
 
-      const response = await fetch('http://localhost:8000/finanzas/facturas/individual', {
+      const response = await fetch('http://127.0.0.1:8000/finanzas/facturas/individual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -106,7 +106,7 @@ export default function AdminPage() {
         id_gerente: parseInt(evento.id_gerente),
       };
 
-      const response = await fetch('http://localhost:8000/finanzas/facturas/evento', {
+      const response = await fetch('http://127.0.0.1:8000/finanzas/facturas/evento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -172,7 +172,7 @@ export default function AdminPage() {
     setMensaje('');
     setClienteFiscalInfo(null);
     try {
-      const res = await fetch(`http://localhost:8000/finanzas/cliente/${checkClienteId}/validar-datos-fiscales`, {
+      const res = await fetch(`http://127.0.0.1:8000/finanzas/cliente/${checkClienteId}/validar-datos-fiscales`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -193,7 +193,7 @@ export default function AdminPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/usuarios/cliente/${checkClienteId}/fiscales`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/usuarios/cliente/${checkClienteId}/fiscales`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,6 +223,12 @@ export default function AdminPage() {
     setMensaje('');
     setDatosReporte(null);
 
+    if (!consulta.fechaInicio || !consulta.fechaFin) {
+      setMensaje('✗ Error: Por favor selecciona ambas fechas');
+      setLoading(false);
+      return;
+    }
+
     if (new Date(consulta.fechaInicio) >= new Date(consulta.fechaFin)) {
       setMensaje('✗ Error: La fecha de inicio debe ser anterior a la fecha de fin');
       setLoading(false);
@@ -237,7 +243,7 @@ export default function AdminPage() {
         tipoGrafica: consulta.tipoGrafica
       };
 
-      const response = await fetch('http://localhost:8000/finanzas/reportes/generar-reporte-ventas', {
+      const response = await fetch('http://127.0.0.1:8000/finanzas/reportes/generar-reporte-ventas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
