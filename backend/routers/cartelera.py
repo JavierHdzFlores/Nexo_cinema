@@ -5,7 +5,7 @@ from datetime import timedelta # <-- NUEVO: Para sumar los minutos de duración 
 
 # Ajusta las importaciones según tu estructura
 from database import get_db 
-from models import ProyeccionPublica, Evento # <-- NUEVO: Importamos Evento para checar empalmes
+from models import ProyeccionPublica, Evento, Sala, EventoPrivado
 import schemas
 
 router = APIRouter(
@@ -73,6 +73,7 @@ def programar_funcion(funcion: schemas.ProyeccionPublicaCreate, db: Session = De
 
     return {
         "mensaje": "Función programada exitosamente y habilitada para venta",
+    # 2. Excepción E1: Validar q
         "id_proyeccion": nueva_proyeccion.id_evento,
         "horario_inicio": nueva_proyeccion.fecha_hora_inicio,
         "horario_fin_con_limpieza": nueva_proyeccion.fecha_hora_fin
@@ -80,7 +81,7 @@ def programar_funcion(funcion: schemas.ProyeccionPublicaCreate, db: Session = De
 
 @router.post("/renta-sala", status_code=status.HTTP_201_CREATED)
 def rentar_sala_privada(renta: schemas.EventoPrivadoCreate, db: Session = Depends(get_db)):
-    """
+    """estwe 
     CU-02: Gestionar Renta de Sala (Evento Privado)
     Bloquea la sala y calcula el total basado en horas y servicios.
     """
@@ -91,21 +92,40 @@ def rentar_sala_privada(renta: schemas.EventoPrivadoCreate, db: Session = Depend
         Evento.fecha_hora_fin > renta.fecha_hora_inicio
     ).all()
 
-    # 2. Excepción E1: Validar que no haya boletos vendidos
+    # 2. Excepción E1: Validar que no haya boletos vendidos 
     if empalmes:
-        for evento in empalmes:
-            # Si el evento empalmado tiene ventas registradas, lanzamos el error crítico
-            if len(evento.ventas) > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Imposible rentar: Existen boletos vendidos para una función en este horario."
-                )
+        hay_ventas = any(len(evento.ventas) > 0 for evento in empalmes)
         
-        # Si hay empalme pero SIN boletos (una función vacía), igual la bloqueamos por precaución
+        # --- NUEVA LÓGICA: Buscar salas alternativas ---
+        # Subconsulta: IDs de las salas que ESTÁN ocupadas en ese rango de horas
+        subquery_ocupadas = db.query(Evento.id_sala).filter(
+            Evento.fecha_hora_inicio < renta.fecha_hora_fin,
+            Evento.fecha_hora_fin > renta.fecha_hora_inicio
+        ).subquery()
+
+        # Consulta principal: Traer las salas que NO están en la subconsulta de ocupadas
+        salas_alternativas = db.query(Sala).filter(~Sala.id_sala.in_(subquery_ocupadas)).all()
+        lista_salas_libres = [sala.id_sala for sala in salas_alternativas]
+        # -----------------------------------------------
+
+        if hay_ventas:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "mensaje": "Imposible rentar: Existen boletos vendidos para esta función.",
+                    "salas_alternativas_disponibles": lista_salas_libres
+                }
+            )
+        
+        # Si hay empalme pero SIN boletos, también bloqueamos y sugerimos
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La sala ya tiene funciones programadas en este horario."
+            detail={
+                "mensaje": "La sala ya tiene funciones programadas en este horario.",
+                "salas_alternativas_disponibles": lista_salas_libres
+            }
         )
+   
 
     # 3. Calcular el costo de la renta (Precio por hora + Servicios Adicionales)
     diferencia_horas = (renta.fecha_hora_fin - renta.fecha_hora_inicio).total_seconds() / 3600
