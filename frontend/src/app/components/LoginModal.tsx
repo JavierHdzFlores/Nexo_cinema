@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -21,18 +22,63 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+  const router = useRouter();
   const [role, setRole] = useState<"cliente" | "trabajador">("cliente");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); //evita que la pagina se recargue
     setLoading(true);
-    setTimeout(() => setLoading(false), 2000);
+    setError('');
+
+    try{
+      // Seleccionar endpoint según el rol
+      const endpoint = role === 'cliente' 
+        ? 'http://localhost:8000/api/auth/login/cliente'
+        : 'http://localhost:8000/api/auth/login';
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ correo: email, password }),
+      });
+    
+      if (!response.ok) {
+        throw new Error('Credenciales incorrectas');
+      }
+
+      const data = await response.json();
+      
+      //guardamos el token en localstore para mantener la seccion activa
+      localStorage.setItem('token', data.access_token)
+
+      // REDIRECCIÓN DEPENDIENDO DEL ROL
+      if (data.tipo_usuario === 'empleado' || data.tipo_usuario === 'gerente') {
+        router.push('/dashboard/staff');
+      } else if (data.tipo_usuario === 'cliente') {
+        router.push('/dashboard/cliente');
+      } else {
+        setError('Rol de usuario no reconocido');
+      }
+      
+    }catch(err: any){
+      setLoading(false);
+      setError(err.message || 'Error al conectar con el servidor');
+    }
+    finally {
+      setLoading(false);
+    }
+
   };
 
   return (
@@ -47,7 +93,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.35 }}
             onClick={onClose}
-            className="fixed inset-0 z-[100]"
+            className="fixed inset-0 z z-[100]"
             style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}
           />
 
@@ -58,7 +104,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 20 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 z-[101] flex items-center justify-center p-4"
+            className="fixed inset-0 z- z-[100] flex items-center justify-center p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div
