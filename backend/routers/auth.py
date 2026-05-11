@@ -110,7 +110,7 @@ def login_cliente(credenciales: schemas.LoginRequest, db: Session = Depends(get_
     if usuario.tipo_usuario != "cliente":
         raise HTTPException(
             status_code = status.HTTP_403_FORBIDDEN,
-            details = "Este portal es exclusivo para clientes. Si formas parte del staff debes iniciar seccion en el panel administrativo" 
+            detail = "Este portal es exclusivo para clientes. Si formas parte del staff debes iniciar seccion en el panel administrativo" 
         )
     
     #generamos el jwt para el cliente

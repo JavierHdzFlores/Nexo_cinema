@@ -178,7 +178,6 @@ export function PaymentModal({
                   style={{
                     background: 'rgba(249,168,37,0.04)',
                     borderColor: 'rgba(249,168,37,0.2)',
-                    divideColor: 'rgba(249,168,37,0.1)',
                   }}
                 >
                   {/* Header del comprobante de puntos */}

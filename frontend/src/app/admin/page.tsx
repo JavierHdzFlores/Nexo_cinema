@@ -863,7 +863,7 @@ export default function AdminPage() {
                           fill="#8884d8"
                           dataKey="total"
                           nameKey="fecha"
-                          label={({ fecha, percent }) => `${fecha} (${(percent * 100).toFixed(0)}%)`}
+                          label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                         >
                           {(datosReporte.datos?.detalle || []).map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={['#f9a825', '#ff4e50', '#8884d8', '#82ca9d'][index % 4]} />
