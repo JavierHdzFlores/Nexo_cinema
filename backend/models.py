@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 from pydantic import BaseModel
@@ -15,6 +15,57 @@ class Sala(Base):
 
     # NUEVO: Efecto espejo hacia Evento
     eventos = relationship("Evento", back_populates="sala")
+
+    # ==========================================
+    # RESPONSABILIDADES (Diagrama CU-02)
+    # ==========================================
+    def verificarBoletosVendidos(self, db, fecha_inicio, fecha_fin) -> bool:
+        """
+        Responsabilidad: Validar si hay boletos vendidos en un rango de tiempo
+        Retorna True si existen boletos vendidos, False si está libre.
+        """
+        from sqlalchemy import inspect
+        if not db:
+            return False
+            
+        eventos_sala = db.query(Evento).filter(
+            Evento.id_sala == self.id_sala,
+            Evento.fecha_hora_inicio < fecha_fin,
+            Evento.fecha_hora_fin > fecha_inicio
+        ).all()
+        
+        for evento in eventos_sala:
+            ventas = db.query(Venta).filter(Venta.id_evento == evento.id_evento).all()
+            if len(ventas) > 0:
+                return True
+        return False
+
+    def cambiarEstado(self, nuevoEstado: str) -> None:
+        """Responsabilidad: Mantener estado de disponibilidad"""
+        self.estado = nuevoEstado
+
+    def bloquearParaTaquilla(self) -> None:
+        """Bloquea la sala estableciendo estado a Evento Privado"""
+        self.cambiarEstado("Evento Privado")
+
+    # ==========================================
+    # RESPONSABILIDADES (Diagrama CU-01)
+    # ==========================================
+    def validarEmpalmes(self, db, fecha_inicio, fecha_fin) -> bool:
+        """
+        Responsabilidad CU-01: Validar empalmes de horario.
+        Retorna True si hay un evento empalmado.
+        """
+        if not db:
+            return False
+            
+        empalmes = db.query(Evento).filter(
+            Evento.id_sala == self.id_sala,
+            Evento.fecha_hora_inicio < fecha_fin,
+            Evento.fecha_hora_fin > fecha_inicio
+        ).all()
+        return len(empalmes) > 0
+
 
 
 class Usuario(Base):
@@ -88,7 +139,7 @@ class Gerente(Empleado):
     reportes_generados = relationship("ReporteVentas", back_populates="gerente")
 
     __mapper_args__ = {"polymorphic_identity": "gerente"}
-    
+
     def consultarReportes(self) -> list:
         return self.reportes_generados
 
@@ -136,6 +187,14 @@ class Gerente(Empleado):
         db.refresh(factura)
         return True
 
+class VendedorDulceria(Empleado):
+    __tablename__ = "vendedores_dulceria"
+    id_vendedor = Column(Integer, ForeignKey("empleados.id_empleado"), primary_key=True)
+    caja_asignada = Column(Integer, nullable=True)
+
+    __mapper_args__ = {"polymorphic_identity": "vendedor_dulceria"}
+
+
 
 class Evento(Base):
     __tablename__ = "eventos"
@@ -180,17 +239,55 @@ class Evento(Base):
             "tipo_evento": self.tipo_evento
         }
 
+# ==========================================
+# CATÁLOGO DE PELÍCULAS (Base de la Cartelera Inteligente)
+# ==========================================
+class Pelicula(Base):
+    __tablename__ = "peliculas"
+    id_pelicula = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    titulo = Column(String(150), nullable=False, unique=True)
+    sinopsis = Column(String(500), nullable=True)
+    clasificacion = Column(String(10), nullable=False) # A, B, B15, C
+    duracion_minutos = Column(Integer, nullable=False)
+    imagen_url = Column(String(255), nullable=True)
+    
+    # Efecto espejo a proyecciones
+    proyecciones = relationship("ProyeccionPublica", back_populates="pelicula_obj")
+
 
 class ProyeccionPublica(Evento):
     __tablename__ = "proyecciones_publicas"
     id_proyeccion = Column(Integer, ForeignKey("eventos.id_evento"), primary_key=True)
-    pelicula = Column(String(100), nullable=False)
-    clasificacion = Column(String(10))
+    id_pelicula = Column(Integer, ForeignKey("peliculas.id_pelicula"), nullable=False)
     precio_boleto = Column(Float, nullable=False)
-    # NUEVA COLUMNA: Necesaria para el cálculo del CU-01
-    duracion_minutos = Column(Integer, nullable=False) 
+    
+    # Relación al catálogo maestro
+    pelicula_obj = relationship("Pelicula", back_populates="proyecciones")
 
     __mapper_args__ = {"polymorphic_identity": "proyeccion_publica"}
+
+    # ==========================================
+    # RESPONSABILIDADES (Diagramas CU-01)
+    # ==========================================
+    @property
+    def tiempo_limpieza(self) -> int:
+        return 30
+
+    def calcularHoraFin(self) -> datetime.datetime:
+        """Calcula la hora de fin sumando duración de película + limpieza"""
+        if not self.pelicula_obj or not self.fecha_hora_inicio:
+            return None
+        return self.fecha_hora_inicio + datetime.timedelta(minutes=self.pelicula_obj.duracion_minutos + self.tiempo_limpieza)
+
+    def registrarFuncion(self, db) -> None:
+        """Responsabilidad: Habilitar venta de boletos (Persistir en BD)"""
+        db.add(self)
+        db.commit()
+        db.refresh(self)
+
+    def mostrarResumen(self) -> str:
+        """Muestra el resumen de la función"""
+        return f"Función de {self.pelicula_obj.titulo} el {self.fecha_hora_inicio} en Sala {self.id_sala}"
 
 class EventoPrivado(Evento):
     __tablename__ = "eventos_privados"
@@ -206,6 +303,32 @@ class EventoPrivado(Evento):
 
     __mapper_args__ = {"polymorphic_identity": "evento_privado"}
 
+    # ==========================================
+    # RESPONSABILIDADES (Diagrama CU-02)
+    # ==========================================
+    def agregarServicio(self, servicio: str) -> None:
+        """Agrega un servicio adicional marcando el flag correspondiente"""
+        if servicio == "microfonos":
+            self.req_microfonos = True
+        elif servicio == "catering":
+            self.req_catering = True
+        elif servicio == "iluminacion":
+            self.req_iluminacion = True
+            
+    def calcularCostoTotal(self) -> float:
+        """Calcula el costo total (renta base + servicios adicionales)"""
+        total = self.costo_renta
+        if self.req_microfonos:
+            total += 500
+        if self.req_catering:
+            total += 3500
+        if self.req_iluminacion:
+            total += 1200
+        return total
+        
+    def generarOrdenCobro(self) -> None:
+        """Genera el proceso de cobro. Implementado en el router y pdf_utils"""
+        pass
 
 # ==========================================
 # ACTUALIZACIÓN EN LA TABLA VENTA
@@ -225,6 +348,36 @@ class Venta(Base):
     evento = relationship("Evento", back_populates="ventas")
     factura_individual = relationship("FacturaIndividual", uselist=False, back_populates="venta")   
     boletos = relationship("Boleto", back_populates="venta") # NUEVO
+
+    # ── Diagrama 4 (Clases Detallado): +flush_para_id() ──
+    def flush_para_id(self, db) -> None:
+        """Sincroniza la venta con BD para obtener el ID antes del commit final"""
+        db.add(self)
+        db.flush()
+
+    # Métodos de Estado (Máquina de Estados)
+    def iniciarVenta(self):
+        self.estado = "Iniciada"
+        
+    def agregarDetalle(self, articulo, cantidad: int):
+        detalle = DetalleVenta(
+            id_venta=self.id_venta,
+            id_articulo=articulo.id_articulo,
+            cantidad=cantidad,
+            articulo=articulo
+        )
+        detalle.calcularSubtotal()
+        return detalle
+
+    def calcularTotal(self, detalles: list) -> float:
+        self.total = sum(detalle.subtotal for detalle in detalles)
+        return self.total
+        
+    def procesarPago(self):
+        self.estado = "PendienteDePago"
+        
+    def registrarVenta(self):
+        self.estado = "Finalizada"
 
 # ==========================================
 # NUEVAS TABLAS: ASIENTO Y BOLETO (CU-04)
@@ -252,6 +405,26 @@ class Boleto(Base):
     # REGLA DE NEGOCIO: Evitar duplicidad de asientos en tiempo real
     __table_args__ = (
         UniqueConstraint('id_evento', 'id_asiento', name='uix_evento_asiento'),
+    )
+
+class BloqueoAsiento(Base):
+    """
+    Entidad adicional requerida por Regla de Negocio 1 y 2.
+    Maneja el bloqueo temporal durante la selección concurrente (Excepciones E1 y E2).
+    """
+    __tablename__ = "bloqueos_asientos"
+    id_bloqueo = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id_evento = Column(Integer, ForeignKey("eventos.id_evento"), nullable=False)
+    id_asiento = Column(Integer, ForeignKey("asientos.id_asiento"), nullable=False)
+    fecha_expiracion = Column(DateTime, nullable=False)
+    # Identificador de sesión o cliente para saber quién lo bloqueó
+    id_cliente_temp = Column(String(100), nullable=False) 
+
+    evento = relationship("Evento")
+    asiento = relationship("Asiento")
+
+    __table_args__ = (
+        UniqueConstraint('id_evento', 'id_asiento', name='uix_bloqueo_evento_asiento'),
     )
 
 # ============================================================================
@@ -417,18 +590,16 @@ class ArticuloDulceria(Base):
     precio = Column(Float, nullable=False)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, default=10) # Para las alertas de inventario
+    tipo_articulo = Column(String(50)) # Discriminador para herencia
 
+    __mapper_args__ = {
+        "polymorphic_identity": "articulo",
+        "polymorphic_on": tipo_articulo,
+    }
+    
+    def obtenerPrecio(self) -> float:
+        return self.precio
 
-class RegistroLimpieza(Base):
-    __tablename__ = "registros_limpieza"
-
-    id_registro = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    id_sala = Column(Integer, ForeignKey("salas.id_sala"))
-    fecha_inicio = Column(DateTime, default=datetime.datetime.utcnow)
-    fecha_fin = Column(DateTime, nullable=True)
-    duracion = Column(Float, nullable=True)
-
-    sala = relationship("Sala", backref="registros_limpieza")
 
 
 class Insumo(Base):
@@ -463,15 +634,7 @@ class AlertaStock(Base):
     activa = Column(Boolean, default=True)
 
     insumo = relationship("Insumo", backref="alertas")
-    tipo_articulo = Column(String(50)) # Discriminador para herencia
 
-    __mapper_args__ = {
-        "polymorphic_identity": "articulo",
-        "polymorphic_on": tipo_articulo,
-    }
-    
-    def obtenerPrecio(self) -> float:
-        return self.precio
 
 class ProductoIndividual(ArticuloDulceria):
     __tablename__ = "productos_individuales"
@@ -497,7 +660,7 @@ class Combo(ArticuloDulceria):
     def obtenerProductos(self) -> list:
         return self.productos_combo
 
-class Insumo(Base):
+class InsumoDulceria(Base):
     __tablename__ = "insumos_dulceria"
     id_insumo = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
@@ -522,7 +685,7 @@ class RecetaInsumo(Base):
     cantidad_requerida = Column(Float, nullable=False)
     
     producto = relationship("ProductoIndividual", back_populates="receta")
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
 
 class ComboProducto(Base):
     """Asociación Muchos a Muchos entre Combo y ProductoIndividual"""
@@ -571,7 +734,7 @@ class LogMovimiento(Base):
     accion = Column(String(200), nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
-    insumo = relationship("Insumo")
+    insumo = relationship("InsumoDulceria")
     
     def guardarRegistro(self, db):
         db.add(self)
@@ -610,27 +773,27 @@ class Monedero(Base):
     __tablename__ = "monederos"
     id_monedero = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), unique=True, nullable=False)
-    saldoPuntos = Column(Integer, default=0, nullable=False)
-    fechaVencimiento = Column(DateTime)
+    saldo_puntos = Column(Integer, default=0, nullable=False)
+    fecha_vencimiento = Column(DateTime)
     estado = Column(String(50), default="Operativa") # "Operativa", "Vencida", "Bloqueada"
 
     # El Cliente "posee" 1 Monedero (backref crea la relación bidireccional sin tocar la clase Cliente)
     cliente = relationship("Cliente", backref="monedero_obj")
 
     def consultarSaldo(self) -> int:
-        return self.saldoPuntos
+        return self.saldo_puntos
 
     def validarSaldoSuficiente(self, monto: int) -> bool:
-        return self.saldoPuntos >= monto
+        return self.saldo_puntos >= monto
 
     def actualizarSaldo(self, monto: int, operacion: str) -> None:
         if operacion == "Canje":
             if self.validarSaldoSuficiente(monto):
-                self.saldoPuntos -= monto
+                self.saldo_puntos -= monto
             else:
                 raise ValueError("Saldo de puntos insuficiente")
         elif operacion == "Acumular":
-            self.saldoPuntos += monto
+            self.saldo_puntos += monto
 
     # Transiciones de Estado (Diagrama 7 Máquina de Estados CU-06)
     def expirarPlazo(self) -> None:
@@ -641,11 +804,11 @@ class Monedero(Base):
 
     def desbloquearCuenta(self) -> None:
         self.estado = "Operativa"
-        self.saldoPuntos = 0
+        self.saldo_puntos = 0
 
     def reiniciarPuntos(self) -> None:
         self.estado = "Operativa"
-        self.saldoPuntos = 0
+        self.saldo_puntos = 0
 
 class TransaccionPuntos(Base):
     __tablename__ = "transacciones_puntos"
@@ -703,8 +866,8 @@ class ReporteVentas(Base):
     idReporte = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_cine = Column(Integer, ForeignKey("cines.idCine"))
     id_gerente = Column(Integer, ForeignKey("gerentes.id_gerente"))
-    fechaInicio = Column(DateTime, nullable=False)
-    fechaFin = Column(DateTime, nullable=False)
+    fechaInicio = Column(Date, nullable=True)
+    fechaFin = Column(Date, nullable=True)
     tipoGrafica = Column(String(50))
 
     cine = relationship("Cine", back_populates="reportes")
@@ -714,12 +877,24 @@ class ReporteVentas(Base):
         if db is None:
             return {}
         
-        ventas = db.query(Venta).filter(
-            Venta.fecha_venta >= self.fechaInicio,
-            Venta.fecha_venta <= self.fechaFin
-        ).all()
+        query = db.query(Venta)
+        if self.fechaInicio:
+            query = query.filter(Venta.fecha_venta >= self.fechaInicio)
+        if self.fechaFin:
+            fin_dia = datetime.datetime.combine(self.fechaFin, datetime.time.max)
+            query = query.filter(Venta.fecha_venta <= fin_dia)
+            
+        ventas = query.all()
         
         total = sum(v.total for v in ventas)
+        
+        from collections import defaultdict
+        ventas_por_fecha = defaultdict(float)
+        for v in ventas:
+            dia = v.fecha_venta.strftime("%Y-%m-%d") if v.fecha_venta else "Desconocido"
+            ventas_por_fecha[dia] += float(v.total or 0.0)
+            
+        detalle_grafica = [{"fecha": k, "total": v} for k, v in sorted(ventas_por_fecha.items())]
         
         return {
             "idReporte": self.idReporte,
@@ -727,7 +902,8 @@ class ReporteVentas(Base):
             "fechaFin": self.fechaFin,
             "tipoGrafica": self.tipoGrafica,
             "cantidadVentas": len(ventas),
-            "totalVentas": total
+            "totalVentas": total,
+            "detalle": detalle_grafica
         }
 
     def calcularOcupacion(self, db) -> float:
@@ -767,3 +943,31 @@ class Cotizacion(Base):
 
     # Relación para poder acceder a los datos de la sala
     sala = relationship("Sala")
+
+    # ── Diagrama 1 (Clases): +validar_vigencia() ──
+    def validar_vigencia(self) -> bool:
+        """
+        Verifica si la cotización sigue vigente.
+        Si ya expiró, transiciona el estado a 'Vencida' (Diagrama 6: vigencia_expirada).
+        Retorna True si la cotización aún es válida.
+        """
+        if datetime.datetime.utcnow() > self.fecha_vigencia:
+            self.estado = "Vencida"
+            return False
+        return True
+
+    # ── Diagrama 5 (Clases detallado): +crear_registro_db() : void ──
+    def crear_registro_db(self, db) -> None:
+        """Persiste la entidad de cotización en la base de datos."""
+        db.add(self)
+        db.commit()
+        db.refresh(self)
+
+    # ── Diagrama 6 (Máquina de Estados): Transiciones desde 'Pendiente' ──
+    def pago_confirmado(self) -> None:
+        """Transición: Pendiente → Pagada"""
+        self.estado = "Pagada"
+
+    def vigencia_expirada(self) -> None:
+        """Transición: Pendiente → Vencida"""
+        self.estado = "Vencida"

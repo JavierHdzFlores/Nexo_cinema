@@ -12,6 +12,8 @@ export interface ArticuloDulceriaResponse {
   nombre: string;
   precio: number;
   tipo_articulo: string; // 'combo' | 'producto_individual'
+  stock_actual: number;
+  stock_minimo: number;
 }
 
 export interface DetalleVentaRequest {
@@ -21,6 +23,7 @@ export interface DetalleVentaRequest {
 
 export interface VentaDulceriaRequest {
   id_cliente?: number;
+  metodo_pago: string;
   detalles: DetalleVentaRequest[];
   usar_puntos: boolean;
   puntos_a_usar?: number;

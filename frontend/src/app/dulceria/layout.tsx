@@ -16,7 +16,7 @@
  *   types.ts     → Contratos de tipos (schemas del backend)
  */
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import Link from 'next/link';
 import { Film } from 'lucide-react';
 import type { OperacionMonedero } from './components/LoyaltyPanel';
@@ -27,6 +27,7 @@ import { PaymentModal } from './components/PaymentModal';
 
 import type {
   CartItem,
+  ArticuloDulceriaResponse,
   EstadoVenta,
   VentaDulceriaRequest,
   VentaDulceriaResponse,
@@ -38,10 +39,14 @@ const API_URL = 'http://127.0.0.1:8000/dulceria';
 /* ─── Contexto del Carrito (accesible desde cualquier página hija) ─── */
 interface CartContextType {
   carrito: CartItem[];
-  agregarProducto: (id: number, nombre: string, precio: number) => void;
+  agregarProducto: (producto: ArticuloDulceriaResponse) => void;
   restarProducto: (id: number) => void;
   eliminarProducto: (id: number) => void;
   limpiarCarrito: () => void;
+  // Nuevos campos para sincronizar el summary con el monedero
+  operacion: OperacionMonedero;
+  puntosDisponibles: number;
+  idCliente: number | null;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -63,19 +68,42 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
   /* ── Carrito (estado EnCarga) ── */
   const [carrito, setCarrito] = useState<CartItem[]>([]);
 
-  const agregarProducto = (id: number, nombre: string, precio: number) => {
+  // ── Persistencia del Carrito (Mejora) ──
+  useEffect(() => {
+    const savedCart = localStorage.getItem('nexo_cart');
+    if (savedCart) {
+      try {
+        setCarrito(JSON.parse(savedCart));
+      } catch (e) {
+        console.error("Error loading cart from localStorage", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('nexo_cart', JSON.stringify(carrito));
+  }, [carrito]);
+
+  const agregarProducto = (producto: ArticuloDulceriaResponse) => {
     if (estadoVenta === 'Iniciada') setEstadoVenta('EnCarga');
     setCarrito(prev => {
-      const existe = prev.find(i => i.id_articulo === id);
-      if (existe) {
-        const nueva_cant = existe.cantidad + 1;
-        return prev.map(i =>
-          i.id_articulo === id
-            ? { ...i, cantidad: nueva_cant, subtotal: parseFloat((nueva_cant * precio).toFixed(2)) }
-            : i
+      const itemExistente = prev.find(item => item.id_articulo === producto.id_articulo);
+      
+      // Validación de stock (Mejora)
+      const cantidadActual = itemExistente ? itemExistente.cantidad : 0;
+      if (cantidadActual >= producto.stock_actual) {
+        // Podríamos mostrar un toast aquí
+        return prev;
+      }
+
+      if (itemExistente) {
+        return prev.map(item =>
+          item.id_articulo === producto.id_articulo
+            ? { ...item, cantidad: item.cantidad + 1, subtotal: (item.cantidad + 1) * item.precio }
+            : item
         );
       }
-      return [...prev, { id_articulo: id, nombre, precio, cantidad: 1, subtotal: precio, tipo_articulo: '' }];
+      return [...prev, { ...producto, cantidad: 1, subtotal: producto.precio }];
     });
   };
 
@@ -113,9 +141,9 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
     setErrorCuenta(null);
     try {
       const res = await fetch(`${API_URL}/monedero/${id}/saldo`);
-      const data = await res.json();
+      const data: MonederoSaldoResponse = await res.json();
       if (res.status === 403) {
-        setErrorCuenta(data.detail || 'Cuenta inactiva. Contacte al administrador.');
+        setErrorCuenta((data as any).detail || 'Cuenta inactiva. Contacte al administrador.');
         return;
       }
       if (res.status === 404) {
@@ -146,6 +174,18 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
   /* ── Máquina de estados (Diagrama 6 CU-05) ── */
   const [estadoVenta, setEstadoVenta] = useState<EstadoVenta>('Iniciada');
   const [respuestaVenta, setRespuestaVenta] = useState<VentaDulceriaResponse | null>(null);
+  const [idEvento, setIdEvento] = useState<number | ''>('');
+
+  // ── Auto-fill del ID de Evento desde la URL (Mejora UX) ──
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const ev = params.get('evento');
+      if (ev && !isNaN(Number(ev))) {
+        setIdEvento(Number(ev));
+      }
+    }
+  }, []);
 
   const subtotal = carrito.reduce((acc, i) => acc + i.subtotal, 0);
   const descuentoPuntos = (operacion === 'canjear' && idCliente)
@@ -162,12 +202,14 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
   };
 
   /* Transición: PendienteDePago → Pagada → Finalizada (POST /dulceria/vender) */
-  const handleProcesarPago = async () => {
+  const handleProcesarPago = async (metodoPago: string) => {
     // La API centraliza todo, pero a nivel UI pasamos por "Pagada" si tiene éxito
     setEstadoVenta('PendienteDePago');
 
     const body: VentaDulceriaRequest = {
       id_cliente: idCliente ?? undefined,
+      id_evento: idEvento !== '' ? Number(idEvento) : undefined,
+      metodo_pago: metodoPago,
       usar_puntos: operacion === 'canjear',
       puntos_a_usar: descuentoPuntos,
       detalles: carrito.map(i => ({ id_articulo: i.id_articulo, cantidad: i.cantidad })),
@@ -183,7 +225,7 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
 
       if (res.ok) {
         setEstadoVenta('Pagada');
-        
+
         // Simulación rápida de emisión de ticket (Diagrama 6: Pagada -> Finalizada)
         setTimeout(() => {
           setRespuestaVenta(data);
@@ -194,7 +236,8 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
           }
         }, 800);
       } else {
-        alert(`Error del sistema: ${data}`);
+        const errorMsg = (data as any).detail || 'Error desconocido';
+        alert(`Error del sistema: ${errorMsg}`);
         setEstadoVenta('EnCarga'); // E1 / E2: volver para corregir la orden
       }
     } catch {
@@ -209,11 +252,21 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
     setOperacion('acumular');
     setEstadoVenta('Iniciada');
     setRespuestaVenta(null);
+    setIdEvento('');
   };
 
   /* ─────────────────────────────────────────────────────────── RENDER ─── */
   return (
-    <CartContext.Provider value={{ carrito, agregarProducto, restarProducto, eliminarProducto, limpiarCarrito }}>
+    <CartContext.Provider value={{ 
+      carrito, 
+      agregarProducto, 
+      restarProducto, 
+      eliminarProducto, 
+      limpiarCarrito,
+      operacion,
+      puntosDisponibles,
+      idCliente
+    }}>
       <div className="min-h-screen text-white" style={{ background: '#080b14' }}>
 
         {/* ═════════ HEADER ═════════ */}
@@ -237,8 +290,6 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
               >
                 NEXO CINEMA
               </span>
-              <span className="text-white/20 text-sm font-light">/</span>
-              <span className="text-white/40 text-sm font-medium">Dulcería</span>
             </Link>
 
             {/* Panel Monedero (CU-06 inline en header) */}
@@ -262,8 +313,8 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
                 style={{
                   background: estadoVenta === 'Iniciada' ? 'rgba(255,255,255,0.15)'
                     : estadoVenta === 'EnCarga' ? '#f9a825'
-                    : estadoVenta === 'Finalizada' ? '#22c55e'
-                    : '#ff4e50',
+                      : estadoVenta === 'Finalizada' ? '#22c55e'
+                        : '#ff4e50',
                 }}
               />
               <span className="text-[10px] font-medium uppercase tracking-widest text-white/30">
@@ -290,13 +341,11 @@ export default function DulceriaLayout({ children }: { children: ReactNode }) {
 
           {/* DERECHA: Ticket / CartSummary */}
           <CartSummary
-            items={carrito}
             total={subtotal}
             descuentoPuntos={descuentoPuntos}
             granTotal={granTotal}
-            usarPuntos={operacion === 'canjear'}
-            onAdd={agregarProducto}
-            onSubtract={restarProducto}
+            idEvento={idEvento}
+            setIdEvento={setIdEvento}
             onClearCart={limpiarCarrito}
             onCheckout={handleSolicitarCobro}
           />
