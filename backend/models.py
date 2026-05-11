@@ -139,14 +139,7 @@ class Gerente(Empleado):
     reportes_generados = relationship("ReporteVentas", back_populates="gerente")
 
     __mapper_args__ = {"polymorphic_identity": "gerente"}
-    
-class VendedorDulceria(Empleado):
-    __tablename__ = "vendedores_dulceria"
-    id_vendedor = Column(Integer, ForeignKey("empleados.id_empleado"), primary_key=True)
-    caja_asignada = Column(Integer, nullable=True)
 
-    __mapper_args__ = {"polymorphic_identity": "vendedor_dulceria"}
-    
     def consultarReportes(self) -> list:
         return self.reportes_generados
 
@@ -193,6 +186,14 @@ class VendedorDulceria(Empleado):
         db.commit()
         db.refresh(factura)
         return True
+
+class VendedorDulceria(Empleado):
+    __tablename__ = "vendedores_dulceria"
+    id_vendedor = Column(Integer, ForeignKey("empleados.id_empleado"), primary_key=True)
+    caja_asignada = Column(Integer, nullable=True)
+
+    __mapper_args__ = {"polymorphic_identity": "vendedor_dulceria"}
+
 
 
 class Evento(Base):
