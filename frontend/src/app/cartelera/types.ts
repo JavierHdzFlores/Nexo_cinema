@@ -29,7 +29,7 @@ export interface SimulacionCartelera {
 }
 
 export interface CarteleraExitoData {
-  id_proyeccion: int;
+  id_proyeccion: number;
   horario_inicio: string;
   horario_fin_con_limpieza: string;
   mensaje: string;
