@@ -217,7 +217,7 @@ export default function StaffDashboard() {
                 <Link href="/renta" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
                   style={{ background: 'linear-gradient(135deg, #4ade80, #22c55e)', boxShadow: '0 8px 30px rgba(74,222,128,0.3)' }}>
                   <Calendar size={32} className="text-black mb-3" />
-                  <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Renta</span>
+                  <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Renta de sala</span>
                 </Link>
                 
                 <Link href="/corporativos" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
@@ -232,7 +232,7 @@ export default function StaffDashboard() {
                   <span className="text-white font-semibold tracking-wider uppercase text-sm font-sans">Panel Admin (Ventas y Facturas)</span>
                 </Link>
 
-                <Link href="/dulceria" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
+                <Link href="/funciones" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
                   style={{ background: 'linear-gradient(135deg, #f9a825, #ffb94a)', boxShadow: '0 8px 30px rgba(249,168,37,0.3)' }}>
                   <Package size={32} className="text-black mb-3" />
                   <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Programar nueva funcion</span>
@@ -305,8 +305,8 @@ export default function StaffDashboard() {
           )}
 
           {/* Para el resto de empleados o gerentes */}
-          {userPuesto !== 'almacenista' && [
-            ...(userRole === 'gerente' ? [] : [{ id: 'ventas', label: 'Ventas de Hoy', icon: Users }]),
+          {usuario?.puesto !== 'almacenista' && [
+            ...(usuario?.puesto === 'gerente' ? [] : [{ id: 'ventas', label: 'Ventas de Hoy', icon: Users }]),
             { id: 'turnos', label: 'Mis Turnos', icon: Calendar }
           ].map(tab => {
             const isActive = activeTab === tab.id;

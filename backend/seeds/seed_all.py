@@ -142,6 +142,56 @@ def _seed_peliculas(db):
             clasificacion="B",
             duracion_minutos=107,
             imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/xX1v29Qf8R6V1Ww8L6gU6gM8j8.jpg"
+        ),
+        models.Pelicula(
+
+            titulo="Interestelar",
+            sinopsis="Un grupo de astronautas viaja a través de un agujero negro en busca de un nuevo hogar para la humanidad.",
+            clasificacion="B",
+            duracion_minutos=169,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg"
+        ),
+        models.Pelicula(
+            titulo="Avengers: Endgame",
+            sinopsis="Los Vengadores restantes se unen para revertir el caos causado por Thanos y restaurar el universo.",
+            clasificacion="B",
+            duracion_minutos=181,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/or06FN3Dka5tukK1e9sl16pB3iy.jpg"
+        ),
+        models.Pelicula(
+            titulo="The Batman",
+            sinopsis="Batman investiga una serie de asesinatos cometidos por el Acertijo mientras enfrenta la corrupción de Gotham.",
+            clasificacion="B15",
+            duracion_minutos=176,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/74xTEgt7R36Fpooo50r9T25onhq.jpg"
+        ),
+        models.Pelicula(
+            titulo="Top Gun: Maverick",
+            sinopsis="Pete Maverick Mitchell regresa para entrenar a una nueva generación de pilotos de combate.",
+            clasificacion="B",
+            duracion_minutos=131,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/62HCnUTziyWcpDaBO2i1DX17ljH.jpg"
+        ),
+        models.Pelicula(
+            titulo="Joker",
+            sinopsis="Arthur Fleck, un comediante fracasado, cae en la locura y se convierte en el temido Joker.",
+            clasificacion="C",
+            duracion_minutos=122,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg"
+        ),
+        models.Pelicula(
+            titulo="Toy Story 4",
+            sinopsis="Woody y sus amigos emprenden un viaje lleno de aventuras para ayudar a Forky a encontrar su propósito.",
+            clasificacion="AA",
+            duracion_minutos=100,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/w9kR8qbmQ01HwnvK4alvnQ2ca0L.jpg"
+        ),
+        models.Pelicula(
+            titulo="Matrix Resurrections",
+            sinopsis="Neo vuelve al mundo de Matrix y descubre una nueva amenaza que pone en peligro la realidad.",
+            clasificacion="B15",
+            duracion_minutos=148,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/8c4a8kE7PizaGQQnditMmI1xbRp.jpg"
         )
     ]
     for p in catalogo:
