@@ -4,6 +4,9 @@ from database import get_db
 from models import Empleado, Gerente, Usuario, Cliente
 import schemas
 from passlib.context import CryptContext
+from database import get_db
+from schemas import ClienteResponse
+#rom auth import crear_token_acceso # Tu función que valida el token
 
 # Configuración para encriptar contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -91,6 +94,7 @@ def crear_cliente(cliente: schemas.ClienteCreate, db: Session=Depends(get_db)):
     db.commit()
     db.refresh(nuevo_cliente)
 
+
 @router.put("/cliente/{id_cliente}/fiscales", status_code=status.HTTP_200_OK)
 def actualizar_datos_fiscales(id_cliente: int, datos: schemas.ClienteUpdateFiscales, db: Session = Depends(get_db)):
     cliente = db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
@@ -102,3 +106,5 @@ def actualizar_datos_fiscales(id_cliente: int, datos: schemas.ClienteUpdateFisca
     db.commit()
     db.refresh(cliente)
     return {"mensaje": "Datos fiscales actualizados", "rfc": cliente.rfc, "codigo_postal": cliente.codigo_postal}
+
+

@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Film, LogOut, Heart, Ticket, Zap, User, Clock } from 'lucide-react';
 import { MovieGrid } from "./components/MovieGrid"; 
+import { useRouter } from "next/navigation";
+  //definimos los datos que esperamos del backend
 
+interface Usuario{
+  nombre: string;
+  correo: string;
+  monedero: number;
+}
 export default function ClienteDashboard() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'resumen' | 'compras' | 'reservas' | 'puntos'>('resumen');
 
   // Datos simulados
@@ -16,6 +24,53 @@ export default function ClienteDashboard() {
     { label: 'Reservas Activas', value: '2', icon: Clock, color: '#4ade80' },
     { label: 'Favoritas', value: '8', icon: Heart, color: '#ff6b6b' },
   ];
+
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    // Esta función se ejecuta apenas carga la página
+    const obtenerPerfil = async () => {
+      try {
+        // 1. Buscamos el token en el almacenamiento local
+        const token = localStorage.getItem("token");
+
+        // Si no hay token, lo mandamos de patitas a la calle (al login)
+        if (!token) {
+          router.push("/");
+          return;
+        }
+
+        // 2. Hacemos la petición al backend (ajusta la URL a tu endpoint)
+        const respuesta = await fetch("http://localhost:8000/api/auth/me", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            // AQUÍ ESTÁ LA MAGIA: Le mandamos el token al backend
+            "Authorization": `Bearer ${token}` 
+          },
+        });
+
+        if (!respuesta.ok) {
+          // Si el token expiró o es inválido, lo sacamos
+          localStorage.removeItem("token");
+          router.push("/");
+          throw new Error("Sesión inválida");
+        }
+
+        // 3. Guardamos los datos reales en el estado
+        const datos = await respuesta.json();
+        setUsuario(datos);
+
+      } catch (error) {
+        console.error("Error al obtener perfil:", error);
+      } finally {
+        setCargando(false); // Quitamos la pantalla de carga
+      }
+    };
+
+    obtenerPerfil();
+  }, [router]);
 
   return (
     <div className="min-h-screen text-white font-sans selection:bg-[#ff4e50] selection:text-white" style={{ background: '#080b14' }}>

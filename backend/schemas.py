@@ -65,15 +65,7 @@ class ProyeccionPublicaCreate(BaseModel):
 # ESQUEMAS PARA USUARIOS / CLIENTES (Ejemplo para cuando los necesites)
 # ==========================================
 
-class ClienteResponse(BaseModel):
-    id_cliente: int
-    nombre: str
-    correo: str
-    rfc: Optional[str] = None
-    puntos_monedero: int
 
-    class Config:
-        from_attributes = True
 
 # ==========================================
 # ESQUEMAS PARA SALAS
@@ -148,6 +140,15 @@ class ClienteUpdateFiscales(BaseModel):
     rfc: str
     codigo_postal: str
     
+class ClienteResponse(BaseModel):
+    id_cliente: int
+    nombre: str
+    correo: str
+    rfc: Optional[str] = None
+    puntos_monedero: int
+
+    class Config:
+        from_attributes = True    
 # ==========================================
 # ESQUEMAS PARA DULCERÍA Y LEALTAD (CU-05, CU-06)
 # ==========================================

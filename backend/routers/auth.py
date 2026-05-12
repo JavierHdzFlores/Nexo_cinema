@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from database import get_db
-from models import Usuario, Empleado, Gerente
+from models import Usuario, Empleado, Gerente, Cliente
 import schemas
 from passlib.context import CryptContext
 
@@ -9,6 +11,35 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 import jwt
 
+# Aquí le decimos a FastAPI cuál es la URL donde el usuario obtiene su token.
+# Esto es más para la documentación de Swagger, pero es necesario.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/cliente")
+# ==========================================
+# EL "CADENERO" (get_current_user)
+# ==========================================
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sesión expirada o inválida",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Extraemos el ID del 'sub' (que guardamos como string en el login)
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    # Buscamos en la tabla Usuario (la base de todos)
+    usuario = db.query(Usuario).filter(Usuario.id_usuario == int(user_id)).first()
+    
+    if usuario is None:
+        raise credentials_exception
+        
+    return usuario
 # ==========================================
 # CONFIGURACIÓN DEL JWT
 # ==========================================
@@ -134,3 +165,10 @@ def login_cliente(credenciales: schemas.LoginRequest, db: Session = Depends(get_
         "puesto": None
     }
 
+# ==========================================
+# NUEVO ENDPOINT PARA TU DASHBOARD
+# ==========================================
+@router.get("/me", response_model=schemas.ClienteResponse)
+async def leer_mi_perfil(usuario_actual: Usuario = Depends(get_current_user)):
+    """Este es el que usará tu Next.js para quitar el nombre de 'Juan'"""
+    return usuario_actual

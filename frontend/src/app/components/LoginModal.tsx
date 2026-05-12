@@ -21,6 +21,8 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
+
+
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const router = useRouter();
   const [role, setRole] = useState<"cliente" | "trabajador">("cliente");
@@ -32,7 +34,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
-
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); //evita que la pagina se recargue
@@ -86,9 +88,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     finally {
       setLoading(false);
     }
-
   };
-
+ 
   return (
     <AnimatePresence>
       {isOpen && (
