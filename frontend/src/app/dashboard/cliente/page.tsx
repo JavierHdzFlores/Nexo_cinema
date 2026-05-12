@@ -12,6 +12,7 @@ interface Usuario{
   nombre: string;
   correo: string;
   monedero: number;
+  rfc: string;
 }
 export default function ClienteDashboard() {
   const router = useRouter();
@@ -211,21 +212,17 @@ export default function ClienteDashboard() {
                     </div>
                     <div className="flex-1">
                       <p className="text-xs font-medium text-white/40 uppercase tracking-widest">Nombre Completo</p>
-                      <p className="text-white font-medium">Juan Carlos Pérez</p>
+                      <p className="text-white font-medium">{usuario?.nombre}</p>
                     </div>
                   </div>
                   <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.01)' }}>
                     <p className="text-xs font-medium text-white/40 uppercase tracking-widest mb-1">Correo Electrónico</p>
-                    <p className="text-white">juan.perez@email.com</p>
+                    <p className="text-white">{usuario?.correo}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.01)' }}>
-                      <p className="text-xs font-medium text-white/40 uppercase tracking-widest mb-1">Teléfono</p>
-                      <p className="text-white">+55 9 1234-5678</p>
-                    </div>
-                    <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.01)' }}>
-                      <p className="text-xs font-medium text-white/40 uppercase tracking-widest mb-1">Miembro Desde</p>
-                      <p className="text-white">15 Ago, 2024</p>
+                      <p className="text-xs font-medium text-white/40 uppercase tracking-widest mb-1">rfc</p>
+                      <p className="text-white">{usuario?.rfc}</p>
                     </div>
                   </div>
                 </div>
