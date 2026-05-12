@@ -19,6 +19,37 @@ def obtener_catalogo_productos(db: Session = Depends(get_db)):
     productos = db.query(models.ArticuloDulceria).all()
     return productos
 
+@router.post("/productos", response_model=schemas.ArticuloDulceriaResponse)
+def crear_producto(producto: schemas.ArticuloDulceriaCreate, db: Session = Depends(get_db)):
+    nuevo_producto = models.ProductoIndividual(
+        nombre=producto.nombre,
+        precio=producto.precio,
+        stock_actual=producto.stock_actual,
+        stock_minimo=producto.stock_minimo,
+        tipo_articulo=producto.tipo_articulo
+    )
+    db.add(nuevo_producto)
+    db.commit()
+    db.refresh(nuevo_producto)
+    return nuevo_producto
+
+@router.put("/productos/{id_articulo}/stock", response_model=schemas.ArticuloDulceriaResponse)
+def actualizar_stock(id_articulo: int, actualizacion: schemas.ArticuloDulceriaUpdate, db: Session = Depends(get_db)):
+    articulo = db.query(models.ArticuloDulceria).filter(models.ArticuloDulceria.id_articulo == id_articulo).first()
+    if not articulo:
+        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+    
+    if actualizacion.motivo == "merma":
+        articulo.stock_actual -= actualizacion.cantidad
+        if articulo.stock_actual < 0:
+            articulo.stock_actual = 0
+    else:
+        articulo.stock_actual += actualizacion.cantidad
+        
+    db.commit()
+    db.refresh(articulo)
+    return articulo
+
 @router.get("/seed")
 def seed_base_datos(db: Session = Depends(get_db)):
     """Ruta temporal para inicializar la base de datos de dulcería"""

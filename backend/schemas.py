@@ -163,6 +163,17 @@ class ArticuloDulceriaResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ArticuloDulceriaUpdate(BaseModel):
+    cantidad: int
+    motivo: str
+
+class ArticuloDulceriaCreate(BaseModel):
+    nombre: str
+    precio: float
+    stock_actual: int
+    stock_minimo: int = 10
+    tipo_articulo: str = "producto_individual"
+
 class DetalleVentaRequest(BaseModel):
     id_articulo: int
     cantidad: int

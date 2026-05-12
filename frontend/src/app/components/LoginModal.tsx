@@ -39,12 +39,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setLoading(true);
     setError('');
 
-    try{
+    try {
       // Seleccionar endpoint según el rol
-      const endpoint = role === 'cliente' 
+      const endpoint = role === 'cliente'
         ? 'http://localhost:8000/api/auth/login/cliente'
         : 'http://localhost:8000/api/auth/login';
-      
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -52,15 +52,23 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         },
         body: JSON.stringify({ correo: email, password }),
       });
-    
+
       if (!response.ok) {
         throw new Error('Credenciales incorrectas');
       }
 
       const data = await response.json();
-      
+
       //guardamos el token en localstore para mantener la seccion activa
-      localStorage.setItem('token', data.access_token)
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('role', data.tipo_usuario);
+      if (data.puesto) {
+        localStorage.setItem('puesto', data.puesto);
+      } else {
+        localStorage.removeItem('puesto');
+      }
+
+      onClose();
 
       // REDIRECCIÓN DEPENDIENDO DEL ROL
       if (data.tipo_usuario === 'empleado' || data.tipo_usuario === 'gerente') {
@@ -70,8 +78,8 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       } else {
         setError('Rol de usuario no reconocido');
       }
-      
-    }catch(err: any){
+
+    } catch (err: any) {
       setLoading(false);
       setError(err.message || 'Error al conectar con el servidor');
     }

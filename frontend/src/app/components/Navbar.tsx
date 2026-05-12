@@ -125,7 +125,7 @@ export function Navbar() {
                     {item.name}
                   </Link>
                 ))}
-                <button 
+                <button
                   onClick={() => setIsLoginOpen(true)}
                   className="flex items-center gap-2 text-white/80 text-sm py-2" style={{ fontFamily: "'Inter', sans-serif" }}
                 >
@@ -138,9 +138,9 @@ export function Navbar() {
       </motion.nav>
 
       {/* 3. CORRECCIÓN: Renderizamos el Modal aquí abajo, fuera de la etiqueta <nav> */}
-      <LoginModal 
-        isOpen={isLoginOpen} 
-        onClose={() => setIsLoginOpen(false)} 
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
       />
     </>
   );
