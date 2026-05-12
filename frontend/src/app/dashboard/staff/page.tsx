@@ -4,8 +4,17 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Film, LogOut, BarChart3, Users, Package, Calendar, Clock, AlertCircle, Ticket } from 'lucide-react';
+import { useRouter } from "next/navigation";
+
+interface Usuario{
+  nombre: string;
+  correo: string;
+  puesto:  string;
+  turno: string;
+}
 
 export default function StaffDashboard() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'ventas' | 'turnos' | 'inventario'>('ventas');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userPuesto, setUserPuesto] = useState<string | null>(null);
@@ -14,6 +23,8 @@ export default function StaffDashboard() {
   const [newProduct, setNewProduct] = useState({ nombre: '', precio: 0, stock_actual: 0 });
   const [updateData, setUpdateData] = useState({ id_articulo: 0, cantidad: 0, motivo: 'compra' });
 
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [cargando, setCargando] = useState(true);
   const fetchInventario = async () => {
     try {
       const res = await fetch("http://localhost:8000/dulceria/productos");
@@ -21,8 +32,61 @@ export default function StaffDashboard() {
       setInventario(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
   };
+  useEffect(() => {
+    // Esta función se ejecuta apenas carga la página
+    const obtenerPerfil = async () => {
+      try {
+        // 1. Buscamos el token en el almacenamiento local
+        const token = localStorage.getItem("token");
+
+        // Si no hay token, lo mandamos de patitas a la calle (al login)
+        if (!token) {
+          router.push("/");
+          return;
+        }
+
+        // 2. Hacemos la petición al backend (ajusta la URL a tu endpoint)
+        const respuesta = await fetch("http://localhost:8000/api/auth/meEmpleado", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            // AQUÍ ESTÁ LA MAGIA: Le mandamos el token al backend
+            "Authorization": `Bearer ${token}` 
+          },
+        });
+
+        if (!respuesta.ok) {
+          // Si el token expiró o es inválido, lo sacamos
+          localStorage.removeItem("token");
+          router.push("/");
+          throw new Error("Sesión inválida");
+        }
+
+        // 3. Guardamos los datos reales en el estado
+        const datos = await respuesta.json();
+        setUsuario(datos);
+        
+        // 4. Actualizamos el rol y puesto del usuario
+        if (datos.tipo_usuario) {
+          setUserRole(datos.tipo_usuario);
+        }
+        if (datos.puesto) {
+          setUserPuesto(datos.puesto.toLowerCase());
+        }
+
+      } catch (error) {
+        console.error("Error al obtener perfil:", error);
+      } finally {
+        setCargando(false); // Quitamos la pantalla de carga
+      }
+    };
+
+    obtenerPerfil();
+  }, [router]);
+
 
   useEffect(() => {
+    //relizamos una peticion al backend
     if (typeof window !== "undefined") {
       const role = localStorage.getItem('role');
       setUserRole(role);
@@ -31,7 +95,7 @@ export default function StaffDashboard() {
       if (puesto?.toLowerCase() === 'almacenista') {
         setActiveTab('inventario');
         fetchInventario();
-      } else if (role === 'gerente') {
+      } else if (role === 'gerente'|| 'Gerente') {
         setActiveTab('turnos');
       }
     }
@@ -99,7 +163,7 @@ export default function StaffDashboard() {
               NEXO CINEMA
             </span>
             <span className="text-white/20 text-sm font-light">/</span>
-            <span className="text-white/40 text-sm font-medium">Dashboard Staff</span>
+            <span className="text-white/40 text-sm font-medium">Dashboard {usuario?.puesto}</span>
           </Link>
 
           <button
@@ -121,7 +185,7 @@ export default function StaffDashboard() {
             className="text-5xl font-semibold text-white mb-2"
             style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: '0.05em' }}
           >
-            Bienvenido, Staff
+            Bienvenido, {usuario?.nombre}
           </h1>
           <p className="text-white/40 font-light mb-8">
             Panel de control para gestión operacional.
@@ -144,11 +208,17 @@ export default function StaffDashboard() {
                   <Package size={32} className="text-black mb-3" />
                   <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Dulcería</span>
                 </Link>
+
+                <Link href="/dulceria" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
+                  style={{ background: 'linear-gradient(135deg, #f9a825, #ffb94a)', boxShadow: '0 8px 30px rgba(249,168,37,0.3)' }}>
+                  <Package size={32} className="text-black mb-3" />
+                  <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Programar nueva funcion</span>
+                </Link>
               </>
             )}
 
             {/* Solo Gerentes */}
-            {userRole === 'gerente' && (
+            {usuario?.puesto === 'Gerente' && (
               <>
                 <Link href="/renta" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
                   style={{ background: 'linear-gradient(135deg, #4ade80, #22c55e)', boxShadow: '0 8px 30px rgba(74,222,128,0.3)' }}>

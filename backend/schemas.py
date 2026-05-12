@@ -123,6 +123,17 @@ class EmpleadoCreate(BaseModel):
     puesto: str
     turno: str
 
+class EmpleadoResponse(BaseModel):
+    id_usuario: int
+    nombre: str
+    correo: str
+    tipo_usuario: str
+    puesto: str
+    turno: str
+
+    class Config:
+        from_attributes = True
+
 class GerenteCreate(BaseModel):
     nombre: str
     correo: str

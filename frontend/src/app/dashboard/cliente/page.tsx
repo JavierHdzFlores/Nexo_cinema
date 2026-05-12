@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 interface Usuario{
   nombre: string;
   correo: string;
-  monedero: number;
+  monedero: number | 0;
   rfc: string;
 }
 export default function ClienteDashboard() {
@@ -20,7 +20,7 @@ export default function ClienteDashboard() {
 
   // Datos simulados
   const stats = [
-    { label: 'Puntos Disponibles', value: '1,250', icon: Zap, color: '#f9a825' },
+    { label: 'Puntos Disponibles', value: 0, icon: Zap, color: '#f9a825' },
     { label: 'Películas Vistas', value: '12', icon: Ticket, color: '#ff4e50' },
     { label: 'Reservas Activas', value: '2', icon: Clock, color: '#4ade80' },
     { label: 'Favoritas', value: '8', icon: Heart, color: '#ff6b6b' },
@@ -323,7 +323,7 @@ export default function ClienteDashboard() {
                 <h2 className="text-xl font-semibold text-white mb-6">Mi Monedero de Puntos</h2>
                 <div className="p-6 rounded-xl mb-6" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(249,168,37,0.3)' }}>
                   <p className="text-xs font-medium text-white/50 uppercase tracking-widest mb-2">Saldo Disponible</p>
-                  <p className="text-5xl font-bold text-[#f9a825]">1,250</p>
+                  <p className="text-5xl font-bold text-[#f9a825]">{usuario?.monedero}</p>
                   <p className="text-xs text-white/40 mt-2">Equivalente a $62.50</p>
                 </div>
                 <div className="space-y-4">

@@ -136,6 +136,13 @@ def _seed_peliculas(db):
             duracion_minutos=169,
             imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/vZloFAK7NmvMGKE7VkF5UHaz0I.jpg"
         ),
+        models.Pelicula(
+            titulo="El asombroso circo digital",
+            sinopsis="Una mujer queda atrapada en un enloquecedor mundo virtual junto a otros humanos, donde ahora están sujetos a los caprichos de una excéntrica IA y a sus propios traumas del pasado.",
+            clasificacion="B",
+            duracion_minutos=107,
+            imagen_url="https://image.tmdb.org/t/p/w600_and_h900_bestv2/xX1v29Qf8R6V1Ww8L6gU6gM8j8.jpg"
+        )
     ]
     for p in catalogo:
         db.add(p)

@@ -97,10 +97,8 @@ def login_staff(credenciales: schemas.LoginRequest, db: Session = Depends(get_db
             detail="Correo o contraseña incorrectos"
         )
 
-    # 5. Extraer el puesto si es necesario
-    puesto_staff = None
-    if isinstance(usuario, Empleado):
-        puesto_staff = usuario.puesto
+    # 5. Extraer el puesto si es empleado
+    puesto_staff = getattr(usuario, 'puesto', None)
 
     # 6. ¡GENERAR EL JWT REAL!
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -171,4 +169,9 @@ def login_cliente(credenciales: schemas.LoginRequest, db: Session = Depends(get_
 @router.get("/me", response_model=schemas.ClienteResponse)
 async def leer_mi_perfil(usuario_actual: Usuario = Depends(get_current_user)):
     """Este es el que usará tu Next.js para quitar el nombre de 'Juan'"""
+    return usuario_actual
+
+@router.get("/meEmpleado", response_model=schemas.EmpleadoResponse)
+async def leer_mi_perfil_empleado(usuario_actual: Usuario = Depends(get_current_user)):
+    """Este endpoint retorna los datos del empleado con su puesto"""
     return usuario_actual
