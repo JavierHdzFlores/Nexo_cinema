@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { DoorOpen, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { DoorOpen, Check, Users } from 'lucide-react';
 import { FuncionFormData, Sala } from '../types';
 
 interface SeleccionarSalaProps {
   formData: FuncionFormData;
-  setFormData: (data: FuncionFormData) => void;
+  setFormData: (data: any) => void; // Usamos un updater funcional
 }
 
 export function SeleccionarSala({ formData, setFormData }: SeleccionarSalaProps) {
@@ -18,141 +18,115 @@ export function SeleccionarSala({ formData, setFormData }: SeleccionarSalaProps)
     const fetchSalas = async () => {
       try {
         const response = await fetch('http://localhost:8000/api/cartelera/salas');
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Error ${response.status}`);
         const data = await response.json();
         setSalas(data);
       } catch (error) {
-        console.error('Error cargando salas:', error);
-        // Fallback a datos mock en caso de error
-        setSalas([
-          {
-            id_sala: 1,
-            nombre: 'Sala Premium VIP',
-            capacidad: 120,
-            tipo: 'IMAX',
-            estado: 'Disponible',
-          },
-        ]);
+        console.error('Error:', error);
+        setSalas([{ id_sala: 1, nombre: 'Sala Premium VIP', capacidad: 120, tipo: 'IMAX', estado: 'Disponible' }]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchSalas();
   }, []);
 
+  // SOLUCIÓN AL ERROR DE SELECCIÓN:
+  // Usamos el estado previo (prev) para asegurar que no se pierdan otros campos
+  const handleSelect = (id: number) => {
+    setFormData((prev: FuncionFormData) => ({
+      ...prev,
+      id_sala: id
+    }));
+  };
+
   const selectedSala = salas.find(s => s.id_sala === formData.id_sala);
 
-  const getColorBySalaType = (tipo: string) => {
-    const colors: { [key: string]: string } = {
-      'IMAX': 'from-purple-500 to-indigo-500',
-      '3D': 'from-blue-500 to-cyan-500',
-      'Tradicional': 'from-amber-500 to-orange-500',
-      'Familiar': 'from-green-500 to-emerald-500',
-      'Evento': 'from-pink-500 to-rose-500',
-    };
-    return colors[tipo] || 'from-gray-500 to-gray-600';
+  // Mapeo estático de colores para evitar errores de compilación en Tailwind
+  const salaStyles: { [key: string]: string } = {
+    'IMAX': 'border-purple-500/50 bg-purple-500/10 text-purple-400',
+    '3D': 'border-blue-500/50 bg-blue-500/10 text-blue-400',
+    'Tradicional': 'border-amber-500/50 bg-amber-500/10 text-amber-400',
+    'Familiar': 'border-green-500/50 bg-green-500/10 text-green-400',
+    'Evento': 'border-pink-500/50 bg-pink-500/10 text-pink-400',
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
-      {/* Título */}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
           <DoorOpen size={28} className="text-[#ff4e50]" />
           Selecciona una Sala
         </h2>
-        <p className="text-gray-400 text-sm">
-          Elige la sala donde se exhibirá la película. El sistema validará disponibilidad horaria automáticamente.
-        </p>
+        <p className="text-gray-400 text-sm">CU-01: Paso 2. La capacidad define el límite de boletos.</p>
       </div>
 
-      {/* Sala Seleccionada */}
-      {selectedSala && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className={`p-4 rounded-xl bg-gradient-to-r ${getColorBySalaType(selectedSala.tipo)}/10 border-2 border-${getColorBySalaType(selectedSala.tipo)}/30`}
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-widest text-[#f9a825] font-bold mb-2">✓ Seleccionada</p>
-              <p className="text-lg font-bold text-white mb-1">{selectedSala.nombre}</p>
-              <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
-                <p>👥 Capacidad: {selectedSala.capacidad} personas</p>
-                <p>🎬 Tipo: {selectedSala.tipo}</p>
+      {/* Resumen de selección con AnimatePresence */}
+      <AnimatePresence>
+        {selectedSala && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className={`p-4 rounded-xl border-2 ${salaStyles[selectedSala.tipo] || 'border-gray-500'}`}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest opacity-70">Sala Seleccionada</p>
+                <p className="text-xl font-bold text-white">{selectedSala.nombre}</p>
+                <p className="text-sm opacity-90">{selectedSala.tipo} • {selectedSala.capacidad} Asientos</p>
               </div>
+              <Check className="text-white" size={30} />
             </div>
-            <Check size={24} className="text-[#f9a825]" />
-          </div>
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Grilla de Salas */}
-      <div>
-        <h3 className="text-sm uppercase tracking-widest font-bold text-white/60 mb-4">
-          {salas.filter(s => s.estado === 'Disponible').length} Salas Disponibles
-        </h3>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <div
-                key={i}
-                className="h-40 rounded-xl bg-white/5 border border-white/10 animate-pulse"
-              />
-            ))}
-          </div>
+          <p className="text-gray-500 italic">Consultando disponibilidad de salas...</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {salas.map((sala) => (
+          salas.map((sala) => {
+            const isSelected = formData.id_sala === sala.id_sala;
+            const isAvailable = sala.estado === 'Disponible';
+
+            return (
               <motion.button
                 key={sala.id_sala}
-                whileHover={sala.estado === 'Disponible' ? { scale: 1.02 } : {}}
-                whileTap={sala.estado === 'Disponible' ? { scale: 0.98 } : {}}
-                disabled={sala.estado !== 'Disponible'}
-                onClick={() =>
-                  sala.estado === 'Disponible' &&
-                  setFormData({ ...formData, id_sala: sala.id_sala })
-                }
-                className={`p-5 rounded-xl text-left transition-all ${
-                  formData.id_sala === sala.id_sala
-                    ? `bg-gradient-to-br ${getColorBySalaType(sala.tipo)} text-black border border-transparent shadow-lg`
-                    : sala.estado === 'Disponible'
-                    ? 'bg-black/30 border border-white/10 text-white hover:border-white/30'
-                    : 'bg-black/50 border border-red-500/20 text-gray-400 opacity-60 cursor-not-allowed'
+                type="button"
+                whileHover={isAvailable ? { scale: 1.02 } : {}}
+                whileTap={isAvailable ? { scale: 0.98 } : {}}
+                disabled={!isAvailable}
+                onClick={() => handleSelect(sala.id_sala)}
+                className={`p-5 rounded-xl text-left transition-all border-2 relative overflow-hidden ${
+                  isSelected
+                    ? 'border-[#f9a825] bg-[#f9a825]/20 shadow-[0_0_20px_rgba(249,168,37,0.15)]'
+                    : isAvailable 
+                    ? 'border-white/10 bg-white/5 hover:border-white/30 text-white'
+                    : 'border-red-900/30 bg-red-950/10 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-bold text-sm">{sala.nombre}</p>
-                    <p className="text-xs opacity-75 mt-1">{sala.tipo}</p>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="z-10">
+                    <p className={`font-bold ${isSelected ? 'text-[#f9a825]' : ''}`}>{sala.nombre}</p>
+                    <p className="text-[10px] uppercase tracking-tighter opacity-60 font-bold">{sala.tipo}</p>
                   </div>
-                  {formData.id_sala === sala.id_sala && (
-                    <Check size={20} className="text-black" />
-                  )}
+                  {isSelected && <Check size={18} className="text-[#f9a825]" />}
                 </div>
-                <div className="flex justify-between items-center text-xs mt-3 pt-3 border-t border-current/20">
-                  <span>👥 {sala.capacidad} personas</span>
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-bold ${
-                      sala.estado === 'Disponible'
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-red-500/20 text-red-400'
-                    }`}
-                  >
-                    {sala.estado}
-                  </span>
+
+                <div className="flex items-center gap-2 text-xs opacity-80">
+                  <Users size={14} />
+                  <span>{sala.capacidad} capacidad</span>
                 </div>
+
+                {!isAvailable && (
+                  <div className="absolute top-2 right-2 px-2 py-1 bg-red-500/20 rounded text-[10px] text-red-400 font-bold">
+                    OCUPADA
+                  </div>
+                )}
               </motion.button>
-            ))}
-          </div>
+            );
+          })
         )}
       </div>
     </motion.div>

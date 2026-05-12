@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Film, ChevronRight, ChevronLeft } from 'lucide-react';
-import { FuncionFormData, FuncionResponse } from './types';
+// IMPORTANTE: Asegúrate de tener Pelicula y Sala exportados en tu archivo types.ts
+import { FuncionFormData, FuncionResponse, Pelicula, Sala } from './types';
 
 import { SeleccionarPelicula } from './components/SeleccionarPelicula';
 import { SeleccionarSala } from './components/SeleccionarSala';
@@ -17,6 +18,10 @@ export default function FuncionesPage() {
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<FuncionResponse | null>(null);
 
+  // Estados para guardar los datos reales de la base de datos
+  const [dbPeliculas, setDbPeliculas] = useState<Pelicula[]>([]);
+  const [dbSalas, setDbSalas] = useState<Sala[]>([]);
+
   const [formData, setFormData] = useState<FuncionFormData>({
     id_pelicula: 0,
     id_sala: 0,
@@ -25,24 +30,50 @@ export default function FuncionesPage() {
     duracion_limpieza: 30,
   });
 
+  // Descargar catálogos al iniciar la página
+  useEffect(() => {
+    const fetchCatalogos = async () => {
+      try {
+        const [resPeliculas, resSalas] = await Promise.all([
+          fetch('http://localhost:8000/api/cartelera/peliculas'),
+          fetch('http://localhost:8000/api/cartelera/salas')
+        ]);
+        
+        if (resPeliculas.ok) {
+          const dataPeliculas = await resPeliculas.json();
+          setDbPeliculas(dataPeliculas);
+        }
+        
+        if (resSalas.ok) {
+          const dataSalas = await resSalas.json();
+          setDbSalas(dataSalas);
+        }
+      } catch (err) {
+        console.error('Error cargando los catálogos:', err);
+      }
+    };
+
+    fetchCatalogos();
+  }, []);
+
+  // Buscar los objetos seleccionados EN LOS DATOS DE LA DB
+  const pelicula = dbPeliculas.find((p) => p.id_pelicula === formData.id_pelicula);
+  const sala = dbSalas.find((s) => s.id_sala === formData.id_sala);
+
   const validateStep = (currentStep: number): boolean => {
     setError(null);
 
-    if (currentStep === 1) {
-      if (formData.id_pelicula === 0) {
-        setError('Por favor, selecciona una película para continuar.');
-        return false;
-      }
-    } else if (currentStep === 2) {
-      if (formData.id_sala === 0) {
-        setError('Debes seleccionar una sala disponible para continuar.');
-        return false;
-      }
-    } else if (currentStep === 3) {
-      if (!formData.fecha || !formData.hora_inicio) {
-        setError('Por favor, completa la fecha y hora de inicio.');
-        return false;
-      }
+    if (currentStep === 1 && formData.id_pelicula === 0) {
+      setError('Por favor, selecciona una película para continuar.');
+      return false;
+    } 
+    if (currentStep === 2 && formData.id_sala === 0) {
+      setError('Debes seleccionar una sala disponible para continuar.');
+      return false;
+    } 
+    if (currentStep === 3 && (!formData.fecha || !formData.hora_inicio)) {
+      setError('Por favor, completa la fecha y hora de inicio.');
+      return false;
     }
 
     return true;
@@ -61,17 +92,10 @@ export default function FuncionesPage() {
     setError(null);
 
     try {
-      // Calcular hora de fin basada en duración de película + limpieza
-      const pelicula = peliculas.find((p) => p.id_pelicula === formData.id_pelicula);
       if (!pelicula) {
-        setError('Película no válida');
+        setError('Película no válida o no encontrada.');
         return;
       }
-
-      const inicio = new Date(`2000-01-01T${formData.hora_inicio}`);
-      const duracionTotal = pelicula.duracion_minutos + formData.duracion_limpieza;
-      const fin = new Date(inicio.getTime() + duracionTotal * 60000);
-      const horaFin = fin.toTimeString().substring(0, 5);
 
       const payload = {
         id_pelicula: formData.id_pelicula,
@@ -94,8 +118,7 @@ export default function FuncionesPage() {
 
       const data = await response.json();
 
-      const sala = salas.find((s) => s.id_sala === formData.id_sala);
-      const resultado: FuncionResponse = {
+      const resultadoFinal: FuncionResponse = {
         id_evento: data.id_proyeccion,
         id_pelicula: formData.id_pelicula,
         id_sala: formData.id_sala,
@@ -105,10 +128,10 @@ export default function FuncionesPage() {
         fecha_hora_fin: data.horario_fin_con_limpieza,
         duracion_limpieza: formData.duracion_limpieza,
         estado: 'Programada',
-        mensaje: data.mensaje,
+        mensaje: data.mensaje || 'Función programada correctamente.',
       };
 
-      setResultado(resultado);
+      setResultado(resultadoFinal);
       setStep(4);
     } catch (err) {
       setError('Error de conexión. Verifica que el servidor esté en línea.');
@@ -119,61 +142,6 @@ export default function FuncionesPage() {
   };
 
   const stepTitles = ['Película', 'Sala', 'Fecha y Hora', 'Confirmar'];
-
-  // Datos ficticios de películas y salas para el resumen
-  const peliculas = [
-    {
-      id_pelicula: 1,
-      titulo: 'Avatar: El Sentido del Agua',
-      director: 'James Cameron',
-      duracion_minutos: 192,
-      clasificacion: 'PG-13',
-      genero: 'Ciencia Ficción',
-    },
-    {
-      id_pelicula: 2,
-      titulo: 'Oppenheimer',
-      director: 'Christopher Nolan',
-      duracion_minutos: 180,
-      clasificacion: 'R',
-      genero: 'Drama',
-    },
-    {
-      id_pelicula: 3,
-      titulo: 'Barbie',
-      director: 'Greta Gerwig',
-      duracion_minutos: 114,
-      clasificacion: 'PG',
-      genero: 'Comedia',
-    },
-  ];
-
-  const salas = [
-    {
-      id_sala: 1,
-      nombre: 'Sala Premium VIP',
-      capacidad: 120,
-      tipo: 'IMAX',
-      estado: 'Disponible',
-    },
-    {
-      id_sala: 2,
-      nombre: 'Sala Estándar 2D',
-      capacidad: 150,
-      tipo: 'Tradicional',
-      estado: 'Disponible',
-    },
-    {
-      id_sala: 3,
-      nombre: 'Sala 3D Deluxe',
-      capacidad: 100,
-      tipo: '3D',
-      estado: 'Disponible',
-    },
-  ];
-
-  const pelicula = peliculas.find((p) => p.id_pelicula === formData.id_pelicula);
-  const sala = salas.find((s) => s.id_sala === formData.id_sala);
 
   return (
     <main className="min-h-screen bg-[#030213] text-white pt-24 pb-12 px-6">
