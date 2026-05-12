@@ -195,7 +195,7 @@ export default function StaffDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             
             {/* Empleados (Taquilla, Dulcería) o Gerentes */}
-            {(userRole === 'empleado' && userPuesto !== 'almacenista') && (
+            {(usuario?.puesto === 'empleado' && userPuesto !== 'almacenista') && (
               <>
                 <Link href="/taquilla" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
                   style={{ background: 'linear-gradient(135deg, #ff4e50, #E50914)', boxShadow: '0 8px 30px rgba(229,9,20,0.3)' }}>
@@ -207,12 +207,6 @@ export default function StaffDashboard() {
                   style={{ background: 'linear-gradient(135deg, #f9a825, #ffb94a)', boxShadow: '0 8px 30px rgba(249,168,37,0.3)' }}>
                   <Package size={32} className="text-black mb-3" />
                   <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Dulcería</span>
-                </Link>
-
-                <Link href="/dulceria" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
-                  style={{ background: 'linear-gradient(135deg, #f9a825, #ffb94a)', boxShadow: '0 8px 30px rgba(249,168,37,0.3)' }}>
-                  <Package size={32} className="text-black mb-3" />
-                  <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Programar nueva funcion</span>
                 </Link>
               </>
             )}
@@ -237,11 +231,17 @@ export default function StaffDashboard() {
                   <BarChart3 size={32} className="text-white mb-3" />
                   <span className="text-white font-semibold tracking-wider uppercase text-sm font-sans">Panel Admin (Ventas y Facturas)</span>
                 </Link>
+
+                <Link href="/dulceria" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
+                  style={{ background: 'linear-gradient(135deg, #f9a825, #ffb94a)', boxShadow: '0 8px 30px rgba(249,168,37,0.3)' }}>
+                  <Package size={32} className="text-black mb-3" />
+                  <span className="text-black font-semibold tracking-wider uppercase text-sm font-sans">Programar nueva funcion</span>
+                </Link>
               </>
             )}
 
             {/* Solo Almacenistas */}
-            {userPuesto === 'almacenista' && (
+            {usuario?.puesto === 'almacenista' && (
               <button onClick={() => setActiveTab('inventario')} className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
                 style={{ background: 'linear-gradient(135deg, #f9a825, #ffb94a)', boxShadow: '0 8px 30px rgba(249,168,37,0.3)' }}>
                 <Package size={32} className="text-black mb-3" />
