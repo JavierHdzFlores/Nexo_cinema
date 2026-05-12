@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Film, LogOut, Heart, Ticket, Zap, User, Clock } from 'lucide-react';
+import { MovieGrid } from "./components/MovieGrid"; 
 
 export default function ClienteDashboard() {
   const [activeTab, setActiveTab] = useState<'resumen' | 'compras' | 'reservas' | 'puntos'>('resumen');
@@ -322,6 +323,7 @@ export default function ClienteDashboard() {
             </div>
           </motion.div>
         )}
+        <MovieGrid />
       </main>
     </div>
   );
