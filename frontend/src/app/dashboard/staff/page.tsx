@@ -131,7 +131,7 @@ export default function StaffDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             
             {/* Empleados (Taquilla, Dulcería) o Gerentes */}
-            {(userRole === 'gerente' || (userRole === 'empleado' && userPuesto !== 'almacenista')) && (
+            {(userRole === 'empleado' && userPuesto !== 'almacenista') && (
               <>
                 <Link href="/taquilla" className="flex flex-col items-center justify-center p-6 rounded-2xl transition-transform hover:scale-105"
                   style={{ background: 'linear-gradient(135deg, #ff4e50, #E50914)', boxShadow: '0 8px 30px rgba(229,9,20,0.3)' }}>
